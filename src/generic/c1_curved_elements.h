@@ -41,7 +41,7 @@ namespace oomph
   namespace MyC1CurvedElements
   {
     // HERE replace with class enum in c++11?
-    /// \short enum to enumerate the possible edges that could be curved
+    /// enum to enumerate the possible edges that could be curved
     enum Edge
     {
       none = -1,
@@ -50,13 +50,15 @@ namespace oomph
       two = 2
     };
 
+
+    // [zdec] I see no point in having this base class?
     class BernadouElementBasisBase
     {
     public:
       BernadouElementBasisBase(){};
       virtual ~BernadouElementBasisBase(){};
 
-      /// \short Shorthand for a vector of vectors containining the vertices
+      /// Shorthand for a vector of vectors containining the vertices
       typedef Vector<Vector<double>> VertexList;
 
       /// Get the basis for the  unknowns
@@ -135,12 +137,12 @@ namespace oomph
     /// chi(s).
     ///
     /* The Structure */
-    /*      @ */
-    /*     /(       Dij      /(          Mij |\                           */
-    /*    /. \      ->      /. \         ->          | \ */
-    /*   /._._)            /._._) |____\                       */
-    /*  @     @ */
-    /*                                                                            */
+    /*      @                 @                      @                        */
+    /*     /(       Dij      /(          Mij         |\                       */
+    /*    /. \      ->      /. \         ->          |. \                     */
+    /*   /. . )            /. . )                    |. . \                   */
+    /*  @-----@           @-----@                    @-----@                  */
+    /*                                                                        */
     /*  Physical (21):      Reference dofs (21):     basic dofs(36): */
     /*   w(ai)               w(ai)                   w(ahati) */
     /*   w,j(ai)             w,tij (ai)              w,j(ahati) */
@@ -150,8 +152,7 @@ namespace oomph
     /*                                               w(di) */
     /*                                               w,n(di) */
     /* where tij are the two tangents at node ai and tjk are the two tangents
-     * opp-*/
-    /* osite ai. ai are nodes, bi are midside points and di are mid-midside
+     * opposite ai. ai are nodes, bi are midside points and di are mid-midside
      * points*/
     /* ei are internal dofs at points Fk(ei_hat) where ei hat are at (1/4,1/4)
      */
@@ -195,10 +196,10 @@ namespace oomph
                            const CurvilineGeomObject& parametric_curve)
       {
         // Store vertices
-        vertices = verts;
+        Vertices = verts;
         // Set up the new curved data for the element
-        s_ubar = su;
-        s_obar = so;
+        S_ubar = su;
+        S_obar = so;
         Curved_edge = curved_edge;
         /// Fill in the function values at vertex 0
         Chi_subar.resize(2);
@@ -247,7 +248,7 @@ namespace oomph
       /// Get the vertices const version
       inline VertexList get_vertices() const
       {
-        return vertices;
+        return Vertices;
       }
 
       /// Get the values of s at start of parametric curve section
@@ -256,7 +257,7 @@ namespace oomph
         // If we have upgraded
         if (Curved_edge != none)
         {
-          return s_ubar;
+          return S_ubar;
         }
         else
         {
@@ -273,7 +274,7 @@ namespace oomph
         // If we have upgraded
         if (Curved_edge != none)
         {
-          return s_obar;
+          return S_obar;
         }
         else
         {
@@ -284,6 +285,117 @@ namespace oomph
         }
       }
 
+
+      /// Get the position at start of parametric curve section
+      inline const Vector<double>& get_chi_subar() const
+      {
+        // If we have upgraded
+        if (Curved_edge != none)
+        {
+          return Chi_subar;
+        }
+        else
+        {
+          throw OomphLibError("The element has not been upgraded yet. Did \
+  you forget to set a Curved_edge?",
+                              OOMPH_CURRENT_FUNCTION,
+                              OOMPH_EXCEPTION_LOCATION);
+        }
+      }
+
+      
+      /// Get the position at start of parametric curve section
+      inline const Vector<double>& get_chi_sobar() const
+      {
+        // If we have upgraded
+        if (Curved_edge != none)
+        {
+          return Chi_sobar;
+        }
+        else
+        {
+          throw OomphLibError("The element has not been upgraded yet. Did \
+  you forget to set a Curved_edge?",
+                              OOMPH_CURRENT_FUNCTION,
+                              OOMPH_EXCEPTION_LOCATION);
+        }
+      }
+
+      
+      /// Get the position at start of parametric curve section
+      inline const Vector<double>& get_d_chi_subar() const
+      {
+        // If we have upgraded
+        if (Curved_edge != none)
+        {
+          return D_chi_subar;
+        }
+        else
+        {
+          throw OomphLibError("The element has not been upgraded yet. Did \
+  you forget to set a Curved_edge?",
+                              OOMPH_CURRENT_FUNCTION,
+                              OOMPH_EXCEPTION_LOCATION);
+        }
+      }
+
+      
+      /// Get the position at start of parametric curve section
+      inline const Vector<double>& get_d_chi_sobar() const
+      {
+        // If we have upgraded
+        if (Curved_edge != none)
+        {
+          return D_chi_sobar;
+        }
+        else
+        {
+          throw OomphLibError("The element has not been upgraded yet. Did \
+  you forget to set a Curved_edge?",
+                              OOMPH_CURRENT_FUNCTION,
+                              OOMPH_EXCEPTION_LOCATION);
+        }
+      }
+
+
+      
+      /// Get the position at start of parametric curve section
+      inline const Vector<double>& get_d2_chi_subar() const
+      {
+        // If we have upgraded
+        if (Curved_edge != none)
+        {
+          return D2_chi_subar;
+        }
+        else
+        {
+          throw OomphLibError("The element has not been upgraded yet. Did \
+  you forget to set a Curved_edge?",
+                              OOMPH_CURRENT_FUNCTION,
+                              OOMPH_EXCEPTION_LOCATION);
+        }
+      }
+
+
+      
+      /// Get the position at start of parametric curve section
+      inline const Vector<double>& get_d2_chi_sobar() const
+      {
+        // If we have upgraded
+        if (Curved_edge != none)
+        {
+          return D2_chi_sobar;
+        }
+        else
+        {
+          throw OomphLibError("The element has not been upgraded yet. Did \
+  you forget to set a Curved_edge?",
+                              OOMPH_CURRENT_FUNCTION,
+                              OOMPH_EXCEPTION_LOCATION);
+        }
+      }
+
+      
       /// The approximated (3rd order) polynomial
       void psi_h(const double& s1, Vector<double>& psi_h) const;
 
@@ -329,13 +441,13 @@ namespace oomph
       // Data is private
     private:
       /// The vertices supplied from the element
-      VertexList vertices;
+      VertexList Vertices;
 
       /// Parametric coordinate at vertex 0 (assuming 2 is always curved edge)
-      double s_ubar;
+      double S_ubar;
 
       /// Parametric coordinate at vertex 1 (assuming 2 is always curved edge)
-      double s_obar;
+      double S_obar;
 
       /// The function evaluate at vertex 0 (assuming 2 is always curved edge)
       Vector<double> Chi_subar;
@@ -401,7 +513,7 @@ namespace oomph
       /// Vector version  (labelling Ai i in {1,2} anticlockwise)
       inline double A1(const unsigned& i) const
       {
-        return vertices[2][i] - vertices[0][i];
+        return Vertices[2][i] - Vertices[0][i];
       }
 
       /// \short void version filling in the first of the two tangent vectors at
@@ -411,7 +523,7 @@ namespace oomph
       {
         for (unsigned i = 0; i < 2; ++i)
         {
-          v[i] = vertices[2][i] - vertices[0][i];
+          v[i] = Vertices[2][i] - Vertices[0][i];
         }
       }
 
@@ -419,7 +531,7 @@ namespace oomph
       /// Vector version  (labelling Ai i in {1,2} anticlockwise)
       inline double A2(const unsigned& i) const
       {
-        return (s_obar - s_ubar) * D_chi_subar[i];
+        return (S_obar - S_ubar) * D_chi_subar[i];
       }
 
       /// \short void version filling in the second of the two tangent vectors
@@ -434,7 +546,7 @@ namespace oomph
       /// Bi i in {1,2} anticlockwise)
       inline double B1(const unsigned& i) const
       {
-        return -(s_obar - s_ubar) * D_chi_sobar[i];
+        return -(S_obar - S_ubar) * D_chi_sobar[i];
       }
 
       /// \short Fill in first tangent vector at node 1 and (labelling Bi i in
@@ -449,38 +561,38 @@ namespace oomph
       /// (labelling Bi i in {1,2} anticlockwise)
       inline double B2(const unsigned& i) const
       {
-        return (vertices[2][i] - vertices[1][i]);
+        return (Vertices[2][i] - Vertices[1][i]);
       }
 
-      /// \short Fill in second tangent vector at node 1 and (labelling Bi i in
+      /// Fill in second tangent vector at node 1 and (labelling Bi i in
       /// {1,2} anticlockwise)
       inline void B2(Vector<double>& v) const
       {
         for (unsigned i = 0; i < 2; ++i)
         {
-          v[i] = vertices[2][i] - vertices[1][i];
+          v[i] = Vertices[2][i] - Vertices[1][i];
         }
       }
 
       /// The vectors of d2_chi defined at node 0
       inline void D1(Vector<double>& v) const
       {
-        v[0] = pow(s_obar - s_ubar, 2) * D2_chi_subar[0];
-        v[1] = pow(s_obar - s_ubar, 2) * D2_chi_subar[1];
+        v[0] = pow(S_obar - S_ubar, 2) * D2_chi_subar[0];
+        v[1] = pow(S_obar - S_ubar, 2) * D2_chi_subar[1];
       }
 
       /// The vectors of d2_chi defined at node 1
       inline void D2(Vector<double>& v) const
       {
-        v[0] = pow(s_obar - s_ubar, 2) * D2_chi_sobar[0];
-        v[1] = pow(s_obar - s_ubar, 2) * D2_chi_sobar[1];
+        v[0] = pow(S_obar - S_ubar, 2) * D2_chi_sobar[0];
+        v[1] = pow(S_obar - S_ubar, 2) * D2_chi_sobar[1];
       }
 
 
-      /// \short Enumerated type that represents the three potential points
+      /// Enumerated type that represents the three potential points
       /// along
       ///  a side of the triangle
-      enum s_basic_node
+      enum S_basic_node
       {
         one_quarter = 0,
         one_half = 1,
@@ -733,7 +845,7 @@ namespace oomph
 
       /// \short Get 5th order, 1D hermite shape functions at basic nodes
       /// Dofs: w(0) w(1) w'(0) w'(1) w''(0) w''(1)
-      void hermite_shape_1d_5(const s_basic_node& s, Shape& psi) const;
+      void hermite_shape_1d_5(const S_basic_node& s, Shape& psi) const;
 
       /// \short The local derivative of 5th order, 1D hermite shape functions
       /// Dofs: w(0) w(1) w'(0) w'(1) w''(0) w''(1)
@@ -741,7 +853,7 @@ namespace oomph
 
       /// \short The local derivative of 5th order, 1D hermite shape functions
       /// Dofs: w(0) w(1) w'(0) w'(1) w''(0) w''(1) at basic_node
-      void d_hermite_shape_1d_5(const s_basic_node& s, DShape& dpsi) const;
+      void d_hermite_shape_1d_5(const S_basic_node& s, DShape& dpsi) const;
 
       /// \short Get 3rd order, 1D hermite shape functions
       /// Dofs: w(0) w(1) w'(0) w'(1)
@@ -749,7 +861,7 @@ namespace oomph
 
       /// \short Get 3rd order, 1D hermite shape functions
       /// Dofs: w(0) w(1) w'(0) w'(1) at basic node
-      void hermite_shape_1d_3(const s_basic_node& s, Shape& psi) const;
+      void hermite_shape_1d_3(const S_basic_node& s, Shape& psi) const;
 
       // Now define the w trace column vectors fi i in {1,2,3}
       // These are effectively column vectors that, when dotted with the local
@@ -759,49 +871,49 @@ namespace oomph
       /// Padded shape functions for trace on side 1
       Vector<double> f_1(const double& s0) const;
       /// Padded shape functions for trace on side 1  at basic nodes
-      Vector<double> f_1(const s_basic_node& s0) const;
+      Vector<double> f_1(const S_basic_node& s0) const;
       /// Local derivative of padded shape functions for trace on side 1
       Vector<double> df_1_ds(const double& s0) const;
       /// \short Local derivative of padded shape functions for trace on side 1
       /// at basic nodes
-      Vector<double> df_1_ds(const s_basic_node& s0) const;
+      Vector<double> df_1_ds(const S_basic_node& s0) const;
 
       /// Padded shape functions for trace on side 2
       Vector<double> f_2(const double& s1) const;
       /// Padded shape functions for trace on side 2  at basic nodes
-      Vector<double> f_2(const s_basic_node& s1) const;
+      Vector<double> f_2(const S_basic_node& s1) const;
       /// Local derivative of padded shape functions for trace on side 2
       Vector<double> df_2_ds(const double& s1) const;
       /// \short Local derivative of padded shape functions for trace on side 2
       /// at basic nodes
-      Vector<double> df_2_ds(const s_basic_node& s1) const;
+      Vector<double> df_2_ds(const S_basic_node& s1) const;
 
       /// Padded shape functions for trace on (curved) side 3
       Vector<double> f_3(const double& s0) const;
       /// Padded shape functions for trace on (curved) side 3 at basic nodes
-      Vector<double> f_3(const s_basic_node& s0) const;
+      Vector<double> f_3(const S_basic_node& s0) const;
       /// Local derivative of padded shape functions for trace on (curved) side
       /// 3
       Vector<double> df_3_ds(const double& s0) const;
       /// Local derivative of padded shape functions for trace on (curved) side
       /// 3 at basic nodes
-      Vector<double> df_3_ds(const s_basic_node& s0) const;
+      Vector<double> df_3_ds(const S_basic_node& s0) const;
 
       // Now define the  w,n trace column vectors gi i in {1,2,3}
       /// Padded shape functions for normal derivative trace on side 1
       Vector<double> g_1(const double& s0) const;
       /// Padded shape functions for normal derivative trace on side 1
-      Vector<double> g_1(const s_basic_node& s0) const;
+      Vector<double> g_1(const S_basic_node& s0) const;
 
       /// Padded shape functions for normal derivative trace on side 2
       Vector<double> g_2(const double& s1) const;
       /// Padded shape functions for normal derivative trace on side 2
-      Vector<double> g_2(const s_basic_node& s1) const;
+      Vector<double> g_2(const S_basic_node& s1) const;
 
       /// Padded shape functions for normal derivative trace on (curved) side 3
       Vector<double> g_3(const double& s0) const;
       /// Padded shape functions for normal derivative trace on (curved) side 3
-      Vector<double> g_3(const s_basic_node& s0) const;
+      Vector<double> g_3(const S_basic_node& s0) const;
 
       /// Fill in matrix that transforms the global dofs to the local dofs
       void local_to_global_matrix(DenseMatrix<double>& l2g) const;
@@ -1196,14 +1308,14 @@ definitions.",
       // parametric function
       Vector<Vector<double>> local_vertices(3, Vector<double>(2, 0.0));
       Vector<double> vertex_0(2, 0.0), vertex_1(2, 0.0);
-      parametric_curve_pt.position(Vector<double>(1, s_ubar), vertex_0);
-      parametric_curve_pt.position(Vector<double>(1, s_obar), vertex_1);
+      parametric_curve_pt.position(Vector<double>(1, S_ubar), vertex_0);
+      parametric_curve_pt.position(Vector<double>(1, S_obar), vertex_1);
 
       // Magnitude of the difference
-      const double diff0 = sqrt(pow(vertex_0[0] - vertices[0][0], 2) +
-                                pow(vertex_0[1] - vertices[0][1], 2));
-      const double diff1 = sqrt(pow(vertex_1[0] - vertices[1][0], 2) +
-                                pow(vertex_0[1] - vertices[0][1], 2));
+      const double diff0 = sqrt(pow(vertex_0[0] - Vertices[0][0], 2) +
+                                pow(vertex_0[1] - Vertices[0][1], 2));
+      const double diff1 = sqrt(pow(vertex_1[0] - Vertices[1][0], 2) +
+                                pow(vertex_0[1] - Vertices[0][1], 2));
       const bool vertices_differ_from_curve = diff0 > tol || diff1 > tol;
 
       // The parametric curve does not start and end at the vertices.
