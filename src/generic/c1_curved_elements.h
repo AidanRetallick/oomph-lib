@@ -303,7 +303,7 @@ namespace oomph
         }
       }
 
-      
+
       /// Get the position at start of parametric curve section
       inline const Vector<double>& get_chi_sobar() const
       {
@@ -321,7 +321,7 @@ namespace oomph
         }
       }
 
-      
+
       /// Get the position at start of parametric curve section
       inline const Vector<double>& get_d_chi_subar() const
       {
@@ -339,7 +339,7 @@ namespace oomph
         }
       }
 
-      
+
       /// Get the position at start of parametric curve section
       inline const Vector<double>& get_d_chi_sobar() const
       {
@@ -358,7 +358,6 @@ namespace oomph
       }
 
 
-      
       /// Get the position at start of parametric curve section
       inline const Vector<double>& get_d2_chi_subar() const
       {
@@ -377,7 +376,6 @@ namespace oomph
       }
 
 
-      
       /// Get the position at start of parametric curve section
       inline const Vector<double>& get_d2_chi_sobar() const
       {
@@ -395,7 +393,7 @@ namespace oomph
         }
       }
 
-      
+
       /// The approximated (3rd order) polynomial
       void psi_h(const double& s1, Vector<double>& psi_h) const;
 

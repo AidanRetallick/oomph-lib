@@ -184,23 +184,23 @@ namespace oomph
       // Loop over the non vertex nodes
       unsigned n_node = this->nnode();
       unsigned n_vertex_node = this->nvertex_node();
-      for(unsigned j_node = n_vertex_node; j_node<n_node; j_node++)
+      for (unsigned j_node = n_vertex_node; j_node < n_node; j_node++)
       {
-	// Store the node pointer
-	Node* node_pt = this->node_pt(j_node);
-	// Get the local position of the node
-	Vector<double> s(2,0.0);
-	this->local_coordinate_of_node(j_node,s);
-	// Get the global interpolated position of the node
-	Vector<double> interp_x(2,0.0);
-	interpolated_x(s, interp_x);
-	// Set the global coordinate of the node using the subparametric
-	// Lagrange interpolation
-	node_pt->x(0) = interp_x[0];
-	node_pt->x(1) = interp_x[1];
+        // Store the node pointer
+        Node* node_pt = this->node_pt(j_node);
+        // Get the local position of the node
+        Vector<double> s(2, 0.0);
+        this->local_coordinate_of_node(j_node, s);
+        // Get the global interpolated position of the node
+        Vector<double> interp_x(2, 0.0);
+        interpolated_x(s, interp_x);
+        // Set the global coordinate of the node using the subparametric
+        // Lagrange interpolation
+        node_pt->x(0) = interp_x[0];
+        node_pt->x(1) = interp_x[1];
       }
     } // End of repair_lagrange_node_positions
-    
+
   }; // End of Subparametric TElement class
 
 
@@ -758,14 +758,14 @@ Elements.",
       switch (boundary_order)
       {
         case 3:
-	  // [zdec] debug
-	  oomph_info << "Upgrading to a 3-er" << std::endl;
+          // [zdec] debug
+          oomph_info << "Upgrading to a 3-er" << std::endl;
           add_new_curved_basis<BernadouElementBasis<3>>();
           new_integral_pt = new TGauss<2, 13>;
           break;
         case 5:
-	  // [zdec] debug
-	  oomph_info << "Upgrading to a 5-er" << std::endl;
+          // [zdec] debug
+          oomph_info << "Upgrading to a 5-er" << std::endl;
           add_new_curved_basis<BernadouElementBasis<5>>();
           new_integral_pt = new TGauss<2, 16>;
           break;
