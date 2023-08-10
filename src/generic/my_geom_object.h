@@ -37,18 +37,18 @@ namespace oomph
   // My Geometric object
   ////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////
-  /// \short Specialisation of GeomObject that has a scalar parametric zeta and
+  /// Specialisation of GeomObject that has a scalar parametric zeta and
   /// a 2D vector r coordinate r = (r_1(zeta),r_2(zeta)).
   /// This is suitable for use in meshing/construction of planar objects.
   class CurvilineGeomObject : public GeomObject
 
   {
   public:
-    /// \short Constructor: Pass dimension of geometric object (# of Eulerian
+    /// Constructor: Pass dimension of geometric object (# of Eulerian
     /// coords = # of Lagrangian coords; no time history available/needed)
     CurvilineGeomObject() : GeomObject(1, 2) {}
 
-    /// \short Constructor: pass # of Eulerian and Lagrangian coordinates
+    /// Constructor: pass # of Eulerian and Lagrangian coordinates
     /// and pointer to time-stepper which is used to handle the
     /// position at previous timesteps and allows the evaluation
     /// of veloc/acceleration etc. in cases where the GeomData
@@ -73,7 +73,7 @@ namespace oomph
     /// (Empty) destructor
     virtual ~CurvilineGeomObject() {}
 
-    /// \short Derivative of position Vector w.r.t. to zeta:
+    /// Derivative of position Vector w.r.t. to zeta:
     virtual void dposition(const Vector<double>& zeta,
                            Vector<double>& drdzeta) const
     {
@@ -84,7 +84,7 @@ namespace oomph
     }
 
 
-    /// \short 2nd derivative of position Vector w.r.t. to coordinates:
+    /// 2nd derivative of position Vector w.r.t. to coordinates:
     /// \f$ \frac{d^2R_i}{d \zeta_\alpha d \zeta_\beta}\f$ =
     /// ddrdzeta(alpha,beta,i).
     /// Evaluated at current time.

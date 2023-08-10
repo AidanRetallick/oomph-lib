@@ -70,7 +70,6 @@ namespace oomph
       BrokenCopy::broken_assign(OOMPH_CURRENT_FUNCTION);
     }
 
-
     /// Interpolate global coordinate x using simplex shape functions.
     void interpolated_x(const Vector<double>& s, Vector<double>& x) const
     {

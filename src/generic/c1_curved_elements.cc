@@ -107,7 +107,7 @@ namespace oomph
       for (unsigned i = 0; i < 2; ++i)
       {
         // The affine part
-        fk[i] = vertices[2][i] - a1[i] * s[0] -
+        fk[i] = Vertices[2][i] - a1[i] * s[0] -
                 b2[i] * s[1]
                 // The additional curved part
                 + 0.5 * s[0] * s[1] *
@@ -149,7 +149,7 @@ namespace oomph
           6 * (a1[i] - b2[i]) + 3 * b1[i] - 3 * a2[i] + 0.5 * (d2[i] - d1[i]);
 
         // The affine part
-        fk[i] = vertices[2][i] - a1[i] * s[0] -
+        fk[i] = Vertices[2][i] - a1[i] * s[0] -
                 b2[i] * s[1]
                 // The additional curved part
                 + 0.5 * s[0] * s[1] *
@@ -476,7 +476,7 @@ namespace oomph
     /// Dofs: w(0) w(1) w'(0) w'(1) w''(0) w''(1)
     template<unsigned BOUNDARY_ORDER>
     void BernadouElementBasis<BOUNDARY_ORDER>::hermite_shape_1d_5(
-      const s_basic_node& s, Shape& psi) const
+      const S_basic_node& s, Shape& psi) const
     {
       // These can be determined by a simple matrix inversion
       switch (s)
@@ -526,7 +526,7 @@ namespace oomph
     /// Get the derivatives of 5th order 1d shape at the basic nodes
     template<unsigned BOUNDARY_ORDER>
     void BernadouElementBasis<BOUNDARY_ORDER>::d_hermite_shape_1d_5(
-      const s_basic_node& s, DShape& dpsi) const
+      const S_basic_node& s, DShape& dpsi) const
     {
       // These can be determined by a simple matrix inversion
       switch (s)
@@ -576,7 +576,7 @@ namespace oomph
     /// Dofs: w(0) w(1) w'(0) w'(1)
     template<unsigned BOUNDARY_ORDER>
     void BernadouElementBasis<BOUNDARY_ORDER>::hermite_shape_1d_3(
-      const s_basic_node& s, Shape& psi) const
+      const S_basic_node& s, Shape& psi) const
     {
       // These can be determined by a simple matrix inversion
       switch (s)
@@ -1080,7 +1080,11 @@ namespace oomph
       DenseMatrix<double>& m1) const
     {
       // This should have been passed in as an empty (initialised) 24x3 matrix
-      for (unsigned i = 0; i < 3; ++i) m1(i, i) = 1.0; // Identity matrix
+      // Identity matrix
+      for (unsigned i = 0; i < 3; ++i)
+      {
+	m1(i, i) = 1.0; 
+      }
     }
 
     /// Submatrix M2 (B_2 in Bernadou and Boisserie 1997)
@@ -1094,18 +1098,18 @@ namespace oomph
       DenseMatrix<double> b2(6, 6, 0.0);
 
       // Transforms tangential Derivatives at Node 0 to local dofs
-      b2(0, 0) = -1; // D w(A1) is -D w (-ex)
-      b2(0, 1) = -1;
-      b2(1, 1) = +1; // D w (A2) is D w(-ex + ey)
+      b2(0, 0) = -1.0; // D w(A1) is -D w (-ex)
+      b2(0, 1) = -1.0;
+      b2(1, 1) = +1.0; // D w (A2) is D w(-ex + ey)
 
       // Transforms tangential Derivatives at Node 1 to basic dofs
-      b2(2, 2) = +1;
-      b2(3, 3) = -1; // -D w (B1) is D w (ex - ey)
-      b2(3, 2) = -1; // D w (B2) is D w (-ey)
+      b2(2, 2) = +1.0;
+      b2(3, 3) = -1.0; // D w (B1) is -D w (ex - ey)
+      b2(3, 2) = -1.0; // D w (B2) is D w (-ey)
 
       // Transforms tangential Derivatives at Node 2 to basic dofs
-      b2(4, 5) = +1; // D w (C1) is D w (ey)
-      b2(5, 4) = +1; // D w (C2) is D w (ex)
+      b2(4, 5) = +1.0; // D w (C1) is D w (ey)
+      b2(5, 4) = +1.0; // D w (C2) is D w (ex)
 
       // Fill the Submatrix in using this
       for (unsigned i = 0; i < 6; ++i)
