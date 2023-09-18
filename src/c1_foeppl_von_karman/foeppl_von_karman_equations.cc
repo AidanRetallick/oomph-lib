@@ -450,7 +450,7 @@ namespace oomph
             residuals[local_eqn] +=
               mu * interpolated_dwdt[0] * test_n_w(j_node, k_type) * W;
             // Add body force/pressure term here
-            residuals[local_eqn] -= pressure * test_n_w(j_node, k_type) * W;
+            residuals[local_eqn] += -pressure * test_n_w(j_node, k_type) * W;
 
             for (unsigned alpha = 0; alpha < 2; ++alpha)
             {
@@ -675,7 +675,7 @@ namespace oomph
           residuals[local_eqn] +=
             mu * interpolated_dwdt[0] * test_i_w(k_type) * W;
           // Add body force/pressure term here
-          residuals[local_eqn] -= pressure * test_i_w(k_type) * W;
+          residuals[local_eqn] += -pressure * test_i_w(k_type) * W;
 
           for (unsigned alpha = 0; alpha < 2; ++alpha)
           {
