@@ -635,23 +635,25 @@ namespace oomph
         new_el_pt[1] = el1_pt;
         new_el_pt[2] = el2_pt;
 
-	// [zdec] debug
-	// We want to find out what boundaries each of the nodes are on
-	for(unsigned e = 0; e < 3; e++)
-	{
-	  oomph_info << "Element " << e;
-	  for(unsigned n = 0; n < 3; n++)
-	  {
-	    oomph_info << " node " << n << " is on boundaries: ";
-	    for(unsigned b = 0; b < 3; b++)
-	    {
-	      if(new_el_pt[e]->node_pt(n)->is_on_boundary(b))
-	      {oomph_info << b << " ";}
-	      oomph_info << std::endl;
-	    }
-	  }
-	}
-	
+        // [zdec] debug
+        // We want to find out what boundaries each of the nodes are on
+        for (unsigned e = 0; e < 3; e++)
+        {
+          oomph_info << "Element " << e;
+          for (unsigned n = 0; n < 3; n++)
+          {
+            oomph_info << " node " << n << " is on boundaries: ";
+            for (unsigned b = 0; b < 3; b++)
+            {
+              if (new_el_pt[e]->node_pt(n)->is_on_boundary(b))
+              {
+                oomph_info << b << " ";
+              }
+              oomph_info << std::endl;
+            }
+          }
+        }
+
         return;
       }
 

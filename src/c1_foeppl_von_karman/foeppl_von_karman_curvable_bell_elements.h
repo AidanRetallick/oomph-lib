@@ -183,11 +183,11 @@ namespace oomph
           unsigned j_node = node_on_boundary[j];
           unsigned n_boundary = Nboundary_at_node[j_node];
 
-	  #ifdef PARANOID
+#ifdef PARANOID
           // A node can be on a maximum of two boundaries
           // (if we already have more throw an error)
-	  // [zdec] this error string doesn't work
-	  // [zdec] 0 because all nodes should now be on at most one boundary
+          // [zdec] this error string doesn't work
+          // [zdec] 0 because all nodes should now be on at most one boundary
           if (n_boundary > 1)
           {
             std::stringstream error_stringstream;
@@ -198,12 +198,11 @@ namespace oomph
                                << n_boundary + 1 << "-th boundary."
                                << std::endl;
 
-            throw OomphLibError(
-              error_stringstream.str(),
-	      OOMPH_CURRENT_FUNCTION,
-	      OOMPH_EXCEPTION_LOCATION);
+            throw OomphLibError(error_stringstream.str(),
+                                OOMPH_CURRENT_FUNCTION,
+                                OOMPH_EXCEPTION_LOCATION);
           }
-	  #endif
+#endif
 
           // IMPORTANT
           // If we already have a parametrisation, we need to chack that the
@@ -295,14 +294,14 @@ namespace oomph
 
           switch (Nboundary_at_node[j_node])
           {
-	    // Node is not on a boundary, don't rotate
-	  case 0:
-	    {
-	      break;
-	    }
+              // Node is not on a boundary, don't rotate
+            case 0:
+            {
+              break;
+            }
 
-	    // Node is on a boundary, rotate to the normal-tangent coordinates
-	  case 1:
+              // Node is on a boundary, rotate to the normal-tangent coordinates
+            case 1:
             {
               // Our new coordinate system:
               //     (l, s)=(normal component, tangent component)
@@ -404,7 +403,7 @@ namespace oomph
                     {
                       for (unsigned beta2 = 0; beta2 < 2; beta2++)
                       {
-			for (unsigned gamma2 = 0; gamma2 < 2; gamma2++)
+                        for (unsigned gamma2 = 0; gamma2 < 2; gamma2++)
                         {
                           hess_inv[alpha](beta, gamma) -=
                             jac_inv(alpha, alpha2) *
@@ -470,16 +469,16 @@ namespace oomph
               break;
             }
 
-	    // Node is at a corner, rotate to the tangent1-tangent2
-	    // coordinates
-	  case 2:
+              // Node is at a corner, rotate to the tangent1-tangent2
+              // coordinates
+            case 2:
             {
-	      // // [zdec] Throw an error because we are doing node duplication
-	      // // now. All the length two vectors want swapping for length 1
-	      // // (scalar) values as each node should only be on one boundary.
-	      // throw OomphLibError("You shouldn't be here! There should only be one boundary per node.",
-	      // 			  OOMPH_CURRENT_FUNCTION,
-	      // 			  OOMPH_EXCEPTION_LOCATION);
+              // // [zdec] Throw an error because we are doing node duplication
+              // // now. All the length two vectors want swapping for length 1
+              // // (scalar) values as each node should only be on one boundary.
+              // throw OomphLibError("You shouldn't be here! There should only
+              // be one boundary per node.", 			  OOMPH_CURRENT_FUNCTION,
+              // 			  OOMPH_EXCEPTION_LOCATION);
 
               // Our new coordinate system:
               //     (l, s)=(normal component, tangent component)
@@ -1407,11 +1406,11 @@ namespace oomph
   //=============================================================================
   template<unsigned NNODE_1D>
   double FoepplVonKarmanC1CurvableBellElement<NNODE_1D>::
-  dbasis_and_dtest_u_eulerian_foeppl_von_karman(const Vector<double>& s,
-						Shape& psi_n,
-						DShape& dpsi_n_dx,
-						Shape& test_n,
-						DShape& dtest_n_dx) const
+    dbasis_and_dtest_u_eulerian_foeppl_von_karman(const Vector<double>& s,
+                                                  Shape& psi_n,
+                                                  DShape& dpsi_n_dx,
+                                                  Shape& test_n,
+                                                  DShape& dtest_n_dx) const
   {
     // Initialise and get dpsi w.r.t local coord
     const unsigned n_node = this->nnode();
@@ -1484,15 +1483,15 @@ shape_and_test_foeppl_von_karman(...)",
   //======================================================================
   template<unsigned NNODE_1D>
   double FoepplVonKarmanC1CurvableBellElement<NNODE_1D>::
-  dbasis_and_dtest_w_eulerian_foeppl_von_karman(const Vector<double>& s,
-						Shape& psi_n,
-						Shape& psi_i,
-						DShape& dpsi_n_dx,
-						DShape& dpsi_i_dx,
-						Shape& test_n,
-						Shape& test_i,
-						DShape& dtest_n_dx,
-						DShape& dtest_i_dx) const
+    dbasis_and_dtest_w_eulerian_foeppl_von_karman(const Vector<double>& s,
+                                                  Shape& psi_n,
+                                                  Shape& psi_i,
+                                                  DShape& dpsi_n_dx,
+                                                  DShape& dpsi_i_dx,
+                                                  Shape& test_n,
+                                                  Shape& test_i,
+                                                  DShape& dtest_n_dx,
+                                                  DShape& dtest_i_dx) const
   {
     // Throw if called
     throw OomphLibError("This still needs testing for curved elements.",
@@ -1551,19 +1550,19 @@ dshape_and_dtest_foeppl_von_karman(...)",
   //======================================================================
   template<unsigned NNODE_1D>
   double FoepplVonKarmanC1CurvableBellElement<NNODE_1D>::
-  d2basis_and_d2test_w_eulerian_foeppl_von_karman(const Vector<double>& s,
-						  Shape& psi_n,
-						  Shape& psi_i,
-						  DShape& dpsi_n_dx,
-						  DShape& dpsi_i_dx,
-						  DShape& d2psi_n_dx,
-						  DShape& d2psi_i_dx,
-						  Shape& test_n,
-						  Shape& test_i,
-						  DShape& dtest_n_dx,
-						  DShape& dtest_i_dx,
-						  DShape& d2test_n_dx,
-						  DShape& d2test_i_dx) const
+    d2basis_and_d2test_w_eulerian_foeppl_von_karman(const Vector<double>& s,
+                                                    Shape& psi_n,
+                                                    Shape& psi_i,
+                                                    DShape& dpsi_n_dx,
+                                                    DShape& dpsi_i_dx,
+                                                    DShape& d2psi_n_dx,
+                                                    DShape& d2psi_i_dx,
+                                                    Shape& test_n,
+                                                    Shape& test_i,
+                                                    DShape& dtest_n_dx,
+                                                    DShape& dtest_i_dx,
+                                                    DShape& d2test_n_dx,
+                                                    DShape& d2test_i_dx) const
   {
     // Call the geometrical shape functions and derivatives
     double J = CurvableBellElement<NNODE_1D>::d2_c1_basis_eulerian(
