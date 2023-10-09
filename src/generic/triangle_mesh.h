@@ -97,7 +97,8 @@ namespace oomph
     template<class ELEMENT>
     void split_element_through_barycentre(TimeStepper* const& time_stepper_pt,
                                           FiniteElement* const& el_pt,
-                                          Vector<FiniteElement*>& new_el_pt);
+                                          Vector<FiniteElement*>& new_el_pt,
+					  Vector<Node*>& new_nod_pt);
 
     /// Make sure no elements have two boundary edges by splitting them through
     /// their barycentre (e.g. no corner elements straddling both boundaries)
@@ -290,10 +291,11 @@ namespace oomph
   void TriangleMeshBase::split_element_through_barycentre(
     TimeStepper* const& time_stepper_pt,
     FiniteElement* const& el_pt,
-    Vector<FiniteElement*>& new_el_pt)
+    Vector<FiniteElement*>& new_el_pt,
+    Vector<Node*>& new_nod_pt)
   {
 #ifdef PARANOID
-// Check that the element belongs to this mesh (this seems like a good idea)
+    // Check that the element belongs to this mesh (this seems like a good idea)
 #endif
 
     // Get the type of triangle element we are using
@@ -332,6 +334,19 @@ namespace oomph
         // ensures that dof memory is properly allocated for us)
         Node* c_pt = el0_pt->construct_node(0, time_stepper_pt);
 
+        // We have three elements, fill the vector of new elements
+        new_el_pt.resize(3);
+        new_el_pt[0] = el0_pt;
+        new_el_pt[1] = el1_pt;
+        new_el_pt[2] = el2_pt;
+
+	// We have four nodes, fill the vector of new nodes
+	new_nod_pt.resize(4);
+	new_nod_pt[0] = o0_pt;
+	new_nod_pt[1] = o1_pt;
+	new_nod_pt[2] = o2_pt;
+	new_nod_pt[3] = c_pt;
+
         // Set the locations of the new node
         for (unsigned i = 0; i < dim; i++)
         {
@@ -358,11 +373,6 @@ namespace oomph
         el2_pt->node_pt(1) = o1_pt;
         el2_pt->node_pt(2) = c_pt;
 
-        // Lastly, fill the Vector of new elements and return
-        new_el_pt.resize(3);
-        new_el_pt[0] = el0_pt;
-        new_el_pt[1] = el1_pt;
-        new_el_pt[2] = el2_pt;
         return;
       }
 
@@ -424,6 +434,25 @@ namespace oomph
         Node* a1_pt = el0_pt->construct_node(3, time_stepper_pt);
         Node* a2_pt = el0_pt->construct_node(5, time_stepper_pt);
 
+        // We have three elements, fill the vector of new elements
+        new_el_pt.resize(3);
+        new_el_pt[0] = el0_pt;
+        new_el_pt[1] = el1_pt;
+        new_el_pt[2] = el2_pt;
+
+	// We have ten nodes, fill the vector of new nodes
+	new_nod_pt.resize(10);
+	new_nod_pt[0] = o0_pt;
+	new_nod_pt[1] = o1_pt;
+	new_nod_pt[2] = o2_pt;
+	new_nod_pt[3] = o3_pt;
+	new_nod_pt[4] = o4_pt;
+	new_nod_pt[5] = o5_pt;
+	new_nod_pt[6] = a0_pt;
+	new_nod_pt[7] = a1_pt;
+	new_nod_pt[8] = a2_pt;
+	new_nod_pt[9] = c_pt;
+
         // Set the locations of the new nodes
         for (unsigned i = 0; i < dim; i++)
         {
@@ -463,11 +492,6 @@ namespace oomph
         el2_pt->node_pt(4) = a1_pt;
         el2_pt->node_pt(5) = a0_pt;
 
-        // Lastly, fill the Vector of new elements and return
-        new_el_pt.resize(3);
-        new_el_pt[0] = el0_pt;
-        new_el_pt[1] = el1_pt;
-        new_el_pt[2] = el2_pt;
         return;
       }
 
@@ -572,6 +596,34 @@ namespace oomph
         Node* c1_pt = el1_pt->construct_node(9, time_stepper_pt);
         Node* c2_pt = el2_pt->construct_node(9, time_stepper_pt);
 
+	// We have three elements, fill the vector of new elements
+        new_el_pt.resize(3);
+        new_el_pt[0] = el0_pt;
+        new_el_pt[1] = el1_pt;
+        new_el_pt[2] = el2_pt;
+
+	// We have nineteen nodes, fill the vector of new nodes
+	new_nod_pt.resize(19);
+	new_nod_pt[0]  = o0_pt;
+	new_nod_pt[1]  = o1_pt;
+	new_nod_pt[2]  = o2_pt;
+	new_nod_pt[3]  = o3_pt;
+	new_nod_pt[4]  = o4_pt;
+	new_nod_pt[5]  = o5_pt;
+	new_nod_pt[6]  = o6_pt;
+	new_nod_pt[7]  = o7_pt;
+	new_nod_pt[8]  = o8_pt;
+	new_nod_pt[9]  = o9_pt;
+	new_nod_pt[10] = a0_pt;
+	new_nod_pt[11] = a1_pt;
+	new_nod_pt[12] = a2_pt;
+	new_nod_pt[13] = b0_pt;
+	new_nod_pt[14] = b1_pt;
+	new_nod_pt[15] = b2_pt;
+	new_nod_pt[16] = c0_pt;
+	new_nod_pt[17] = c1_pt;
+	new_nod_pt[18] = c2_pt;
+
         // Set the locations of the new nodes
         for (unsigned i = 0; i < dim; i++)
         {
@@ -629,39 +681,31 @@ namespace oomph
         el2_pt->node_pt(8) = a0_pt;
         // el2_pt->node_pt(9) = c2_pt;
 
-        // Lastly, fill the Vector of new elements and return
-        new_el_pt.resize(3);
-        new_el_pt[0] = el0_pt;
-        new_el_pt[1] = el1_pt;
-        new_el_pt[2] = el2_pt;
 
-	// [zdec] debug
-	// We want to find out what boundaries each of the nodes are on
-	for(unsigned e = 0; e < 3; e++)
-	{
-	  oomph_info << "Element " << e;
-	  for(unsigned n = 0; n < 3; n++)
-	  {
-	    oomph_info << " node " << n << " is on boundaries: ";
-	    for(unsigned b = 0; b < 3; b++)
-	    {
-	      if(new_el_pt[e]->node_pt(n)->is_on_boundary(b))
-	      {oomph_info << b << " ";}
-	      oomph_info << std::endl;
-	    }
-	  }
-	}
-	
+	// // [zdec] debug
+	// // We want to find out what boundaries each of the nodes are on
+	// for(unsigned e = 0; e < 3; e++)
+	// {
+	//   oomph_info << "Element " << e;
+	//   for(unsigned n = 0; n < 3; n++)
+	//   {
+	//     oomph_info << " node " << n << " is on boundaries: ";
+	//     for(unsigned b = 0; b < 3; b++)
+	//     {
+	//       if(new_el_pt[e]->node_pt(n)->is_on_boundary(b))
+	//       {oomph_info << b << " ";}
+	//       oomph_info << std::endl;
+	//     }
+	//   }
+	// }
         return;
       }
 
       default:
       {
         std::string error_message =
-          (std::
-             string)("Triangle elements must have nnode_1d = 2,3 or 4. This element returned\
-nnode_1d() = ") +
-          std::to_string(n_node_1d);
+          (std::string)("Triangle elements must have nnode_1d = 2,3 or 4.\
+ This element returned nnode_1d() = ") + std::to_string(n_node_1d);
         throw OomphLibError(
           error_message, OOMPH_EXCEPTION_LOCATION, OOMPH_CURRENT_FUNCTION);
       }
@@ -768,6 +812,10 @@ nnode_1d() = ") +
     Vector<FiniteElement*> new_or_retained_el_pt;
     new_or_retained_el_pt.reserve(n_el);
 
+    //  Set for retained or newly built nodes
+    // (we use a set to prevent node pointer repetition which is hard to track)
+    std::set<Node*> new_or_retained_nod_pt;
+
     // Map which returns the 3 newly created elements for each old corner
     // element
     std::map<FiniteElement*, Vector<FiniteElement*>> old_to_new_element_map;
@@ -789,9 +837,13 @@ nnode_1d() = ") +
       {
         // Carry it across
         new_or_retained_el_pt.push_back(el_pt);
-        // [zdec] debug
-        oomph_info << "Not splitting element " << e << " at " << el_pt
-                   << std::endl;
+	// Carry across its nodes
+	unsigned n_el_nod = el_pt->nnode();
+	for(unsigned i_el_nod = 0; i_el_nod < n_el_nod; i_el_nod++)
+	{
+	  Node* nod_pt = el_pt->node_pt(i_el_nod);
+	  new_or_retained_nod_pt.insert(nod_pt);
+	}
       }
       // It's in the set of elements to be split
       else
@@ -801,19 +853,26 @@ nnode_1d() = ") +
                    << " into: " << std::endl;
         // Vector to get the pointers to the new elements
         Vector<FiniteElement*> new_el_pt(3, 0);
+	Vector<Node*> new_nod_pt;
 
         // Split the element
         split_element_through_barycentre<ELEMENT>(
-          time_stepper_pt, el_pt, new_el_pt);
+          time_stepper_pt,
+	  el_pt,
+	  new_el_pt,
+	  new_nod_pt);
 
         // Add the new elements to new the Vector of pointers
         new_or_retained_el_pt.push_back(new_el_pt[0]);
         new_or_retained_el_pt.push_back(new_el_pt[1]);
         new_or_retained_el_pt.push_back(new_el_pt[2]);
-        // [zdec] debug
-        oomph_info << "  " << new_el_pt[0] << std::endl;
-        oomph_info << "  " << new_el_pt[1] << std::endl;
-        oomph_info << "  " << new_el_pt[2] << std::endl;
+
+	// Add the nodes to the new Vector of pointers
+	unsigned n_new_nod = new_nod_pt.size();
+	for(unsigned i_new_nod = 0; i_new_nod < n_new_nod; i_new_nod++)
+	{
+	  new_or_retained_nod_pt.insert(new_nod_pt[i_new_nod]);
+	}
 
         // Add the vector to the map
         old_to_new_element_map.insert(
@@ -834,49 +893,57 @@ nnode_1d() = ") +
     // Copy across elements
     n_el = new_or_retained_el_pt.size();
     Element_pt.resize(n_el);
-    // [zdec] debug
-    std::string filename = "element_debug_file.dat";
-    std::string filename_n = "node_debug_file.dat";
-    std::ofstream element_debug;
-    element_debug.open(filename, std::ofstream::out | std::ofstream::trunc);
-    element_debug.close();
-    element_debug.open(filename_n, std::ofstream::out | std::ofstream::trunc);
-    element_debug.close();
+    // // [zdec] debug
+    // std::string filename = "element_debug_file.dat";
+    // std::string filename_n = "node_debug_file.dat";
+    // std::ofstream element_debug;
+    // element_debug.open(filename, std::ofstream::out | std::ofstream::trunc);
+    // element_debug.close();
+    // element_debug.open(filename_n, std::ofstream::out | std::ofstream::trunc);
+    // element_debug.close();
     for (unsigned e = 0; e < n_el; e++)
     {
-      // [zdec] debug: doc all the elements to see the mesh patches
-      oomph_info << "Adding element " << e << " at " << new_or_retained_el_pt[e]
-                 << " nodes to debug file" << std::endl;
-      element_debug.open(filename, std::ios_base::app);
-      // loop over the vertex nodes
-      for (unsigned i = 0; i < 3; i++)
-      {
-        element_debug << new_or_retained_el_pt[e]->node_pt(i)->x(0) << " "
-                      << new_or_retained_el_pt[e]->node_pt(i)->x(1) << " "
-                      << std::endl;
-      }
-      element_debug << new_or_retained_el_pt[e]->node_pt(0)->x(0) << " "
-                    << new_or_retained_el_pt[e]->node_pt(0)->x(1) << " "
-                    << std::endl
-                    << std::endl
-                    << std::endl;
-      element_debug.close();
-      // Loop over all nodes
-      element_debug.open(filename_n, std::ios_base::app);
-      for (unsigned i = 0; i < new_or_retained_el_pt[e]->nnode(); i++)
-      {
-        element_debug << new_or_retained_el_pt[e]->node_pt(i)->x(0) << " "
-                      << new_or_retained_el_pt[e]->node_pt(i)->x(1) << " "
-                      << std::endl;
-      }
-      element_debug << std::endl << std::endl;
-      element_debug.close();
+      // // [zdec] debug: doc all the elements to see the mesh patches
+      // oomph_info << "Adding element " << e << " at " << new_or_retained_el_pt[e]
+      //            << " nodes to debug file" << std::endl;
+      // element_debug.open(filename, std::ios_base::app);
+      // // loop over the vertex nodes
+      // for (unsigned i = 0; i < 3; i++)
+      // {
+      //   element_debug << new_or_retained_el_pt[e]->node_pt(i)->x(0) << " "
+      //                 << new_or_retained_el_pt[e]->node_pt(i)->x(1) << " "
+      //                 << std::endl;
+      // }
+      // element_debug << new_or_retained_el_pt[e]->node_pt(0)->x(0) << " "
+      //               << new_or_retained_el_pt[e]->node_pt(0)->x(1) << " "
+      //               << std::endl
+      //               << std::endl
+      //               << std::endl;
+      // element_debug.close();
+      // // Loop over all nodes
+      // element_debug.open(filename_n, std::ios_base::app);
+      // for (unsigned i = 0; i < new_or_retained_el_pt[e]->nnode(); i++)
+      // {
+      //   element_debug << new_or_retained_el_pt[e]->node_pt(i)->x(0) << " "
+      //                 << new_or_retained_el_pt[e]->node_pt(i)->x(1) << " "
+      //                 << std::endl;
+      // }
+      // element_debug << std::endl << std::endl;
+      // element_debug.close();
       Element_pt[e] = new_or_retained_el_pt[e];
     }
+
+    // Copy across nodes
+    Node_pt.clear();
+    Node_pt.insert(Node_pt.end(),
+		   new_or_retained_nod_pt.begin(),
+		   new_or_retained_nod_pt.end());
 
     // Setup boundary lookup scheme again
     setup_boundary_element_info();
 
+
+    // [zdec] THIS WAS JUST COPIED AND NEEDS CHECKING
     // -------------------------------------------------------------------------
     // The various boundary/region lookups now need updating to account for the
     // newly added/removed elements. This will be done in two stages:
