@@ -188,10 +188,8 @@ namespace oomph
       // Premultiply the weights and the Jacobian
       double W = w * J;
 
-      //===========================
-      // INTERPOLATION================================= Create space for
-      // in-plane
-      // interpolated unknowns
+      //==========================INTERPOLATION=================================
+      // Create space for in-plane interpolated unknowns
       Vector<double> interpolated_u(n_u_fields, 0.0);
       Vector<double> interpolated_dudt(n_u_fields, 0.0);
       DenseMatrix<double> interpolated_dudxi(n_u_fields, n_deriv, 0.0);
@@ -387,11 +385,10 @@ namespace oomph
 
       } // End of loop over internal types -- k_type
 
-      //====================== END OF INTERPOLATION
-      //==============================
+      //==================== END OF INTERPOLATION ==========================
 
-      //====================== RESIDUALS AND JACOBIAN
-      //============================ Get the swelling function
+      //=================== RESIDUALS AND JACOBIAN =========================
+      // Get the swelling function
       double c_swell(0.0);
       get_swelling_foeppl_von_karman(interp_x, c_swell);
 
@@ -458,16 +455,17 @@ namespace oomph
               {
                 // w_{,\alpha\beta} \delta \kappa_\alpha\beta
                 residuals[local_eqn] +=
-                  (1 - nu) * interpolated_d2wdxi2(0, alpha + beta) *
+                  (1.0 - nu) * interpolated_d2wdxi2(0, alpha + beta) *
                   d2test_n_wdxi2(j_node, k_type, alpha + beta) * W;
                 // w_{,\alpha\alpha} \delta \kappa_\beta\beta
                 residuals[local_eqn] +=
-                  (nu)*interpolated_d2wdxi2(0, beta + beta) *
+                  (nu) * interpolated_d2wdxi2(0, beta + beta) *
                   d2test_n_wdxi2(j_node, k_type, alpha + alpha) * W;
                 // sigma_{\alpha\beta} w_{,\alpha} \delta w_{,\beta}
-                residuals[local_eqn] += eta * sigma(alpha, beta) *
-                                        interpolated_dwdxi(0, alpha) *
-                                        dtest_n_wdxi(j_node, k_type, beta) * W;
+                residuals[local_eqn] +=
+		  eta * sigma(alpha, beta) *
+		  interpolated_dwdxi(0, alpha) *
+		  dtest_n_wdxi(j_node, k_type, beta) * W;
               }
             }
 
@@ -503,25 +501,25 @@ namespace oomph
                               eta * nu * dpsi_n_udxi(jj_node, kk_type, gamma) *
                               interpolated_dwdxi(0, alpha) *
                               dtest_n_wdxi(j_node, k_type, beta) /
-                              (1 - nu * nu) * W;
+                              (1.0 - nu * nu) * W;
                           }
                           if (alpha == gamma)
                           {
                             jacobian(local_eqn, local_unknown) +=
-                              eta * (1 - nu) / 2.0 *
+                              eta * (1.0 - nu) / 2.0 *
                               dpsi_n_udxi(jj_node, kk_type, beta) *
                               interpolated_dwdxi(0, alpha) *
                               dtest_n_wdxi(j_node, k_type, beta) /
-                              (1 - nu * nu) * W;
+                              (1.0 - nu * nu) * W;
                           }
                           if (beta == gamma)
                           {
                             jacobian(local_eqn, local_unknown) +=
-                              eta * (1 - nu) / 2.0 *
+                              eta * (1.0 - nu) / 2.0 *
                               dpsi_n_udxi(jj_node, kk_type, alpha) *
                               interpolated_dwdxi(0, alpha) *
                               dtest_n_wdxi(j_node, k_type, beta) /
-                              (1 - nu * nu) * W;
+                              (1.0 - nu * nu) * W;
                           }
                         } // End loop over dimensions --beta
                       } // End loop over in plane displacements -- alpha
@@ -550,8 +548,8 @@ namespace oomph
                   {
                     // Contribution from damping
                     jacobian(local_eqn, local_unknown) +=
-                      psi_n_w(j_node2, k_type2) *
-                      node_pt(j_node2)->time_stepper_pt()->weight(1, 0) * mu *
+                      mu * psi_n_w(j_node2, k_type2) *
+                      node_pt(j_node2)->time_stepper_pt()->weight(1, 0) *
                       test_n_w(j_node, k_type) * W;
                     // Loop over dimensions
                     for (unsigned alpha = 0; alpha < 2; ++alpha)
@@ -587,7 +585,7 @@ namespace oomph
                           interpolated_dwdxi(0, alpha) *
                           dtest_n_wdxi(j_node, k_type, beta) * W;
                         jacobian(local_eqn, local_unknown) +=
-                          eta / 2. * (1 - nu) / (1 - nu * nu) *
+                          eta / 2.0 * (1.0 - nu) / (1.0 - nu * nu) *
                           interpolated_dwdxi(0, beta) *
                           dpsi_n_wdxi(j_node2, k_type2, alpha) *
                           interpolated_dwdxi(0, alpha) *
@@ -621,7 +619,8 @@ namespace oomph
                       // The Linear Terms
                       // w_{,\alpha\beta} \delta \kappa_\alpha\beta
                       jacobian(local_eqn, local_unknown) +=
-                        (1 - nu) * d2psi_i_wdxi2(k_type2, alpha + beta) *
+                        (1.0 - nu) *
+			d2psi_i_wdxi2(k_type2, alpha + beta) *
                         d2test_n_wdxi2(j_node, k_type, alpha + beta) * W;
                       // w_{,\alpha\alpha} \delta \kappa_\beta\beta
                       jacobian(local_eqn, local_unknown) +=
@@ -629,7 +628,8 @@ namespace oomph
                         d2test_n_wdxi2(j_node, k_type, alpha + alpha) * W;
                       // Nonlinear terms
                       jacobian(local_eqn, local_unknown) +=
-                        eta * sigma(alpha, beta) * dpsi_i_wdxi(k_type2, alpha) *
+                        eta * sigma(alpha, beta) *
+			dpsi_i_wdxi(k_type2, alpha) *
                         dtest_n_wdxi(j_node, k_type, beta) * W;
                       // Nonlinear terms
                       jacobian(local_eqn, local_unknown) +=
@@ -681,19 +681,19 @@ namespace oomph
           {
             for (unsigned beta = 0; beta < 2; ++beta)
             {
-              // The Linear Terms
               // w_{,\alpha\beta} \delta \kappa_\alpha\beta
-              residuals[local_eqn] += (1 - nu) *
-                                      interpolated_d2wdxi2(0, alpha + beta) *
-                                      d2test_i_wdxi2(k_type, alpha + beta) * W;
+              residuals[local_eqn] +=
+		(1.0 - nu) * interpolated_d2wdxi2(0, alpha + beta) *
+		d2test_i_wdxi2(k_type, alpha + beta) * W;
               // w_{,\alpha\alpha} \delta \kappa_\beta\beta
               residuals[local_eqn] +=
-                (nu)*interpolated_d2wdxi2(0, beta + beta) *
+                (nu) * interpolated_d2wdxi2(0, beta + beta) *
                 d2test_i_wdxi2(k_type, alpha + alpha) * W;
               // sigma_{\alpha\beta} w_\alpha \delta w_{,\beta}
-              residuals[local_eqn] += eta * sigma(alpha, beta) *
-                                      interpolated_dwdxi(0, alpha) *
-                                      dtest_i_wdxi(k_type, beta) * W;
+              residuals[local_eqn] +=
+		eta * sigma(alpha, beta) *
+		interpolated_dwdxi(0, alpha) *
+		dtest_i_wdxi(k_type, beta) * W;
             }
           }
 
@@ -711,8 +711,7 @@ namespace oomph
                 // Loop over displacements
                 for (unsigned gamma = 0; gamma < 2; ++gamma)
                 {
-                  local_unknown =
-                    this->nodal_local_eqn(jj_node, gamma); //[zdec]
+                  local_unknown = this->nodal_local_eqn(jj_node, gamma);
                   // If at a non-zero degree of freedom add in the entry
                   if (local_unknown >= 0)
                   {
@@ -728,7 +727,8 @@ namespace oomph
                           jacobian(local_eqn, local_unknown) +=
                             eta * nu * dpsi_n_udxi(jj_node, kk_type, gamma) *
                             interpolated_dwdxi(0, alpha) *
-                            dtest_i_wdxi(k_type, beta) / (1.0 - nu * nu) * W;
+                            dtest_i_wdxi(k_type, beta) /
+			    (1.0 - nu * nu) * W;
                         }
                         if (alpha == gamma)
                         {
@@ -736,15 +736,17 @@ namespace oomph
                             eta * (1.0 - nu) / 2.0 *
                             dpsi_n_udxi(jj_node, kk_type, beta) *
                             interpolated_dwdxi(0, alpha) *
-                            dtest_i_wdxi(k_type, beta) / (1.0 - nu * nu) * W;
+                            dtest_i_wdxi(k_type, beta) /
+			    (1.0 - nu * nu) * W;
                         }
                         if (beta == gamma)
                         {
                           jacobian(local_eqn, local_unknown) +=
-                            eta * (1 - nu) / 2.0 *
+                            eta * (1.0 - nu) / 2.0 *
                             dpsi_n_udxi(jj_node, kk_type, alpha) *
                             interpolated_dwdxi(0, alpha) *
-                            dtest_i_wdxi(k_type, beta) / (1.0 - nu * nu) * W;
+                            dtest_i_wdxi(k_type, beta) /
+			    (1.0 - nu * nu) * W;
                         }
                       } // End of loop over beta
                     } // End of loop over alpha

@@ -893,43 +893,43 @@ namespace oomph
     // Copy across elements
     n_el = new_or_retained_el_pt.size();
     Element_pt.resize(n_el);
-    // // [zdec] debug
-    // std::string filename = "element_debug_file.dat";
-    // std::string filename_n = "node_debug_file.dat";
-    // std::ofstream element_debug;
-    // element_debug.open(filename, std::ofstream::out | std::ofstream::trunc);
-    // element_debug.close();
-    // element_debug.open(filename_n, std::ofstream::out | std::ofstream::trunc);
-    // element_debug.close();
+    // [zdec] debug
+    std::string filename = "element_debug_file.dat";
+    std::string filename_n = "node_debug_file.dat";
+    std::ofstream element_debug;
+    element_debug.open(filename, std::ofstream::out | std::ofstream::trunc);
+    element_debug.close();
+    element_debug.open(filename_n, std::ofstream::out | std::ofstream::trunc);
+    element_debug.close();
     for (unsigned e = 0; e < n_el; e++)
     {
-      // // [zdec] debug: doc all the elements to see the mesh patches
-      // oomph_info << "Adding element " << e << " at " << new_or_retained_el_pt[e]
-      //            << " nodes to debug file" << std::endl;
-      // element_debug.open(filename, std::ios_base::app);
-      // // loop over the vertex nodes
-      // for (unsigned i = 0; i < 3; i++)
-      // {
-      //   element_debug << new_or_retained_el_pt[e]->node_pt(i)->x(0) << " "
-      //                 << new_or_retained_el_pt[e]->node_pt(i)->x(1) << " "
-      //                 << std::endl;
-      // }
-      // element_debug << new_or_retained_el_pt[e]->node_pt(0)->x(0) << " "
-      //               << new_or_retained_el_pt[e]->node_pt(0)->x(1) << " "
-      //               << std::endl
-      //               << std::endl
-      //               << std::endl;
-      // element_debug.close();
-      // // Loop over all nodes
-      // element_debug.open(filename_n, std::ios_base::app);
-      // for (unsigned i = 0; i < new_or_retained_el_pt[e]->nnode(); i++)
-      // {
-      //   element_debug << new_or_retained_el_pt[e]->node_pt(i)->x(0) << " "
-      //                 << new_or_retained_el_pt[e]->node_pt(i)->x(1) << " "
-      //                 << std::endl;
-      // }
-      // element_debug << std::endl << std::endl;
-      // element_debug.close();
+      // [zdec] debug: doc all the elements to see the mesh patches
+      oomph_info << "Adding element " << e << " at " << new_or_retained_el_pt[e]
+                 << " nodes to debug file" << std::endl;
+      element_debug.open(filename, std::ios_base::app);
+      // loop over the vertex nodes
+      for (unsigned i = 0; i < 3; i++)
+      {
+        element_debug << new_or_retained_el_pt[e]->node_pt(i)->x(0) << " "
+                      << new_or_retained_el_pt[e]->node_pt(i)->x(1) << " "
+                      << std::endl;
+      }
+      element_debug << new_or_retained_el_pt[e]->node_pt(0)->x(0) << " "
+                    << new_or_retained_el_pt[e]->node_pt(0)->x(1) << " "
+                    << std::endl
+                    << std::endl
+                    << std::endl;
+      element_debug.close();
+      // Loop over all nodes
+      element_debug.open(filename_n, std::ios_base::app);
+      for (unsigned i = 0; i < new_or_retained_el_pt[e]->nnode(); i++)
+      {
+        element_debug << new_or_retained_el_pt[e]->node_pt(i)->x(0) << " "
+                      << new_or_retained_el_pt[e]->node_pt(i)->x(1) << " "
+                      << std::endl;
+      }
+      element_debug << std::endl << std::endl;
+      element_debug.close();
       Element_pt[e] = new_or_retained_el_pt[e];
     }
 
