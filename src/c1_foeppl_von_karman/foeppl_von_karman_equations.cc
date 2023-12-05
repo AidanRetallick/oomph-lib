@@ -44,6 +44,7 @@ namespace oomph
 
   //======================================================================
   /// Fill in generic residual and jacobian contribution
+  // [zdec] Local equation calls are hard coded (eg k_type+2) fix later
   //======================================================================
   void FoepplVonKarmanEquations::
     fill_in_generic_residual_contribution_foeppl_von_karman(
@@ -85,11 +86,7 @@ namespace oomph
     const unsigned n_u_internal_type = nu_type_internal();
     const unsigned n_w_internal_type = nw_type_internal();
 
-#ifdef PARANOID
     // [IN-PLANE-INTERNAL]
-    // This PARANOID block should be deleted if/when internal in-plane
-    // contributions have been implemented
-
     // Throw an error if the number of internal in-plane basis types is non-zero
     if (n_u_internal_type != 0)
     {
@@ -99,7 +96,10 @@ namespace oomph
                           OOMPH_CURRENT_FUNCTION,
                           OOMPH_EXCEPTION_LOCATION);
     }
-#endif
+
+    // Get the state of the flag to determine whether we are assigning a
+    // displacement field to our elements rather than solving FvK equations
+    const bool solve_u_exact = get_solve_u_exact();
 
     // Get the Poisson ratio of the plate
     const double nu = get_nu();
@@ -199,8 +199,7 @@ namespace oomph
       DenseMatrix<double> interpolated_dwdxi(n_w_fields, n_deriv, 0.0);
       DenseMatrix<double> interpolated_d2wdxi2(n_w_fields, n_2deriv, 0.0);
 
-      //---Nodal contribution to the in-plane
-      // unknowns----------------------------
+      //---Nodal contribution to the in-plane unknowns-------------------------
       // Loop over nodes used by in-plane fields
       for (unsigned j_node = 0; j_node < n_u_node; j_node++)
       {
@@ -262,14 +261,12 @@ namespace oomph
       } // End of loop over the nodes -- j_node
 
 
-      //---Internal contribution to the in-plane
-      // unknowns-------------------------
+      //---Internal contribution to the in-plane unknowns----------------------
       // [IN-PLANE-INTERNAL]
       // Internal contributions to in-plane interpolation not written
 
 
-      //---Nodal contribution to the out-of-plane
-      // unknowns------------------------
+      //---Nodal contribution to the out-of-plane unknowns---------------------
       for (unsigned j_node = 0; j_node < n_w_node; j_node++)
       {
         // Get the j-th node used by in-plane fields
@@ -387,7 +384,178 @@ namespace oomph
 
       //==================== END OF INTERPOLATION ==========================
 
-      //=================== RESIDUALS AND JACOBIAN =========================
+
+      //----------------- ALTERNATIVE RESIDUALS IF SET ---------------------
+      // If the flag Solve_u_exact is set, then we solve for a displacement
+      // field assignement instead of the fvk equations.
+      //   ux = ux_exact
+      //   uy = uy_exact
+      //    w = w_exact
+      // We run this if block and then break so that we skip over the remaining
+      // (normal) FvK equations residuals
+      if(solve_u_exact)
+      {
+	// Get the exact displacement field we are trying to assign:
+	//   u_exact = (ux_exact,uy_exact,w_exact)
+	Vector<double> u_exact(3,0.0);
+	get_u_exact(interp_x,u_exact);
+
+	//--- In-plane equations --------
+	// Loop over the in-plane displacements alpha = 0,1
+	for(unsigned alpha = 0; alpha < 2; alpha++)
+	{
+	  // Loop over nodal equations
+	  for(unsigned j_node = 0; j_node < n_u_node; j_node++)
+	  {
+	    for(unsigned k_type = 0; k_type < n_u_nodal_type; k_type++)
+	    {
+	      // Get the local equation number associated with this dof, if it
+	      // is not pinned, add its contribution to the residuals
+	      int eqn_no = nodal_local_eqn(j_node, k_type);
+	      if(eqn_no>=0)
+	      {
+		// u_alpha - u_alpha_exact = 0
+		residuals[eqn_no] += (interpolated_u[alpha] - u_exact[alpha])
+		  * test_n_u(j_node, (alpha*n_u_nodal_type)+k_type) * W;
+
+		// Now the Jacobian
+		if(flag)
+		{
+		  // Loop over the nodal dofs
+		  for(unsigned jj_node = 0; jj_node < n_u_node; jj_node++)
+		  {
+		    for(unsigned kk_type = 0;
+			kk_type < n_u_nodal_type; kk_type++)
+		    {
+		      // Get the eqn number associated with this dof, if it is
+		      // not pinned, add its contribution to the jacobian
+		      int dof_no =
+			nodal_local_eqn(jj_node, (alpha*n_u_nodal_type)+kk_type);
+		      if(dof_no>=0)
+		      {
+			jacobian(eqn_no,dof_no) +=
+			  psi_n_u(jj_node, (alpha*n_u_nodal_type)+kk_type)
+			  * test_n_u(j_node, (alpha*n_u_nodal_type)+k_type) * W;
+		      }
+		    }
+		  }
+
+		  // [IN-PLANE-INTERNAL]
+		  // Internal dof contributions to u would need to be added
+
+		} // End jacobian contributions
+	      }
+	    }
+	  } // End nodal equations
+
+	  // [IN-PLANE-INTERNAL]
+	  // If we ever add internal dof contributions to in-plane, we need to
+	  // add their equations here
+
+	} // End in-plane equations
+
+	//--- Out-of-plane equations ----
+	// Loop over nodal equations
+	for (unsigned j_node = 0; j_node < n_w_node; j_node++)
+	{
+	  for (unsigned k_type = 0; k_type < n_w_nodal_type; k_type++)
+	  {
+	    // Get the local equation number associated with this dof, if it
+	    // is not pinned, add its contribution to the residuals
+	    int eqn_no = nodal_local_eqn(j_node, k_type);
+	    if (eqn_no >= 0)
+	    {
+	      // w - w_exact = 0
+	      residuals[eqn_no] += (interpolated_w[0] - u_exact[2]) *
+		test_n_w(j_node, k_type) * W;
+
+	      // Now the Jacobian
+	      if(flag)
+	      {
+		// Jac contribution from the nodal dofs
+		for(unsigned jj_node = 0; jj_node < n_w_node; jj_node++)
+		{
+		  for(unsigned kk_type = 0; kk_type < n_w_nodal_type; kk_type++)
+		  {
+		    // If this dof isn't pinned add its contribution to the
+		    // jacobian
+		    int dof_no = nodal_local_eqn(jj_node, kk_type + 2);
+		    if(dof_no>=0)
+		    {
+		      jacobian(eqn_no,dof_no) += psi_n_w(jj_node, kk_type)
+			* test_n_w(j_node, k_type) * W;
+		    }
+		  }
+		} // End nodal contribution to nodal equation jac
+		// Jac contribution from the internal dofs
+		for(unsigned kk_type = 0; kk_type < n_w_internal_type; kk_type++)
+		{
+		  // If this dof isn't pinned add its contribution to the
+		  // jacobian
+		  int dof_no = internal_local_eqn(w_index,kk_type);
+		  if(dof_no>=0)
+		  {
+		    jacobian(eqn_no,dof_no) += psi_i_w(kk_type)
+		      * test_n_w(j_node, k_type) * W;
+		  }
+		} // End internal contribution to nodal equation jac
+	      } // End nodal jac
+	    }
+	  }
+	} // End out-of-plane nodal equations
+
+	// Loop over out-of-plane internal equations
+	for (unsigned k_type = 0; k_type < n_w_internal_type; k_type++)
+	{
+	  // Get the local equation number associated with this dof, if it
+	  // is not pinned, add its contribution to the residuals
+	  int eqn_no = internal_local_eqn(w_index, k_type);
+	  if (eqn_no >= 0)
+	  {
+	    // w - w_exact = 0
+	    residuals[eqn_no] +=
+	      (interpolated_w[0] - u_exact[2]) * test_i_w(k_type) * W;
+
+	    // Now the Jacobian
+	    if (flag)
+	    {
+	      // Jac contribution from the nodal dofs
+	      for (unsigned jj_node = 0; jj_node < n_w_node; jj_node++)
+	      {
+		for (unsigned kk_type = 0; kk_type < n_w_nodal_type; kk_type++)
+		{
+		  // If this dof isn't pinned add its contribution to the
+		  // jacobian
+		  int dof_no = nodal_local_eqn(jj_node, kk_type + 2);
+		  if (dof_no >= 0)
+		  {
+		    jacobian(eqn_no, dof_no) +=
+		      psi_n_w(jj_node, kk_type) * test_i_w(k_type) * W;
+		  }
+		}
+	      }
+	      // Jac contribution from the internal dofs
+	      for (unsigned kk_type = 0; kk_type < n_w_internal_type; kk_type++)
+	      {
+		// If this dof isn't pinned add its contribution to the
+		// jacobian
+		int dof_no = internal_local_eqn(w_index, kk_type);
+		if (dof_no >= 0)
+		{
+		  jacobian(eqn_no, dof_no) +=
+		    psi_i_w(kk_type) * test_i_w(k_type) * W;
+		}
+	      } // End internal contribution to internal equation jac
+	    } // End internal jac
+	  }
+	} // End out-of-plane internal equations
+
+	// Now break so that we don't do the rest of
+	break;
+      }
+
+
+      //=============== FVK RESIDUALS AND JACOBIAN =========================
       // Get the swelling function
       double c_swell(0.0);
       get_swelling_foeppl_von_karman(interp_x, c_swell);
@@ -1078,6 +1246,7 @@ namespace oomph
   } // End of fill_in_generic_residual_contribution_foeppl_von_karman
 
 
+
   //======================================================================
   /// Self-test:  Return 0 for OK
   //======================================================================
@@ -1108,18 +1277,18 @@ namespace oomph
   ///
   ///   - : x
   ///   - : y
-  ///   1 : ux            13: strain_xx
-  ///   2 : uy	         14: strain_xy
-  ///   3 : w	         15: strain_yy
-  ///   4 : dwdx	         16: stress_xx
-  ///   5 : dwdy	         17: stress_xy
-  ///   6 : d2wdx2        18: stress_yy
-  ///   7 : d2wdxdy       19: principal_stress_val_1
-  ///   8 : d2wdy2        20: principal_stress_val_2
-  ///   9 : duxdx         21: principal_stress_vec_1x
-  ///   10: duxdy         22: principal_stress_vec_1y
-  ///   11: duydx         23: principal_stress_vec_2x
-  ///   12: duydy         24: principal_stress_vec_2y
+  ///   0 : ux           13: strain_xx
+  ///   1 : uy	         14: strain_xy
+  ///   2 : w	         15: strain_yy
+  ///   3 : du_x/dx      16: stress_xx
+  ///   4 : du_x/dy      17: stress_xy
+  ///   5 : du_y/dx      18: stress_yy
+  ///   6 : du_y/dy      19: principal_stress_val_1
+  ///   7 : dw/dx        20: principal_stress_val_2
+  ///   8 : dw/dy        21: principal_stress_vec_1x
+  ///   9 : d2w/dx2      22: principal_stress_vec_1y
+  ///   10: d2w/dxd      23: principal_stress_vec_2x
+  ///   11: d2w/dy2      24: principal_stress_vec_2y
   ///
   /// nplot points in each coordinate direction
   //======================================================================
@@ -1136,7 +1305,7 @@ namespace oomph
 
     // Storage for variables
     double c_swell(0.0);
-    Vector<double> u;
+    Vector<double> interpolated_vals(12, 0.0);
     DenseMatrix<double> interpolated_dwdxj(1, dim, 0.0);
     DenseMatrix<double> interpolated_duidxj(2, dim, 0.0);
     DenseMatrix<double> epsilon(2, 2, 0.0);
@@ -1154,7 +1323,7 @@ namespace oomph
       interpolated_x(s, x);
 
       // Get interpolated unknowns
-      u = interpolated_u_foeppl_von_karman(s);
+      interpolated_vals = interpolated_fvk_disp_and_deriv(s);
 
       // Get degree of swelling for use in the strain tensor
       this->get_swelling_foeppl_von_karman(x, c_swell);
@@ -1163,12 +1332,12 @@ namespace oomph
       //       output_principal_stress
       // TODO: make the indexing below more general and not hard coded.
       // Copy gradients from u into interpolated gradient matrices...
-      interpolated_dwdxj(0, 0) = u[1]; // dwdx1
-      interpolated_dwdxj(0, 1) = u[2]; // dwdx2
-      interpolated_duidxj(0, 0) = u[8]; // du1dx1
-      interpolated_duidxj(0, 1) = u[9]; // du1dx2
-      interpolated_duidxj(1, 0) = u[10]; // du2dx1
-      interpolated_duidxj(1, 1) = u[11]; // du2dx2
+      interpolated_dwdxj(0, 0) = interpolated_vals[7]; // dw/dx
+      interpolated_dwdxj(0, 1) = interpolated_vals[8]; // dw/dy
+      interpolated_duidxj(0, 0) = interpolated_vals[3]; // du_x/dx
+      interpolated_duidxj(0, 1) = interpolated_vals[4]; // du_x/dy
+      interpolated_duidxj(1, 0) = interpolated_vals[5]; // du_y/dx
+      interpolated_duidxj(1, 1) = interpolated_vals[6]; // du_y/dy
       // ...which are used to retrieve the strain tensor epsilon.
       get_epsilon(epsilon, interpolated_duidxj, interpolated_dwdxj, c_swell);
 
@@ -1185,7 +1354,8 @@ namespace oomph
       }
 
       // Loop for variables
-      for (Vector<double>::iterator it = u.begin(); it != u.end(); ++it)
+      for (Vector<double>::iterator it = interpolated_vals.begin()
+	     ; it != interpolated_vals.end(); ++it)
       {
         outfile << *it << " ";
       }
@@ -1216,90 +1386,99 @@ namespace oomph
   ///
   ///   - : x
   ///   - : y
-  ///   1 : ux
-  ///   2 : uy
-  ///   3 : w
+  ///   0 : ux
+  ///   1 : uy
+  ///   2 : w
   ///
   /// nplot points in each coordinate direction
   //======================================================================
   void FoepplVonKarmanEquations::output(std::ostream& outfile,
                                         const unsigned& nplot)
   {
-    unsigned dim = this->dim();
-
-    // Vector of local coordinates
-    Vector<double> s(dim), x(dim);
-
     // Tecplot header info
     outfile << this->tecplot_zone_string(nplot);
 
-    // Storage for variables
-    Vector<double> u;
-    unsigned num_plot_points = this->nplot_points(nplot);
+    // Number of coordinates
+    unsigned dim = this->dim();
+    // Number of unknowns
+    unsigned n_unknown = 3;
 
     // Loop over plot points
+    unsigned num_plot_points = this->nplot_points(nplot);
     for (unsigned iplot = 0; iplot < num_plot_points; iplot++)
     {
-      // Get local and global coordinates of plot point
+      // Get local coordinates of plot point
+      Vector<double> s(dim);
       this->get_s_plot(iplot, nplot, s);
+
+      // Output the interpolated global coords
+      Vector<double> x(dim, 0.0);
       interpolated_x(s, x);
-
-      // Get interpolated unknowns
-      u = interpolated_u_foeppl_von_karman(s);
-
-      for (unsigned i = 0; i < this->dim(); i++)
+      for (unsigned i = 0; i < dim; i++)
       {
         outfile << x[i] << " ";
       }
 
-      // Loop for variables
-      for (Vector<double>::iterator it = u.begin(); it != u.end(); ++it)
+      // Output the interpolated unknowns
+      Vector<double> interpolated_vals(n_unknown,0.0);
+      interpolated_vals = interpolated_fvk_disp_and_deriv(s);
+      for (Vector<double>::iterator it = interpolated_vals.begin();
+	   it != interpolated_vals.end(); ++it)
       {
         outfile << *it << " ";
       }
-
-      // End output line
-      outfile << std::endl;
     }
+
     // Write tecplot footer (e.g. FE connectivity lists)
     this->write_tecplot_zone_footer(outfile, nplot);
   }
 
 
-  // TODO: update further output functions for full output
+
   //======================================================================
   /// C-style output function:
   ///
-  ///   x,y,u   or    x,y,z,u
+  ///   -: x
+  ///   -: y
+  ///   0: u_x
+  ///   1: u_y
+  ///   2: w
   ///
   /// nplot points in each coordinate direction
   //======================================================================
   void FoepplVonKarmanEquations::output(FILE* file_pt, const unsigned& nplot)
   {
-    // Vector of local coordinates
-    Vector<double> s(this->dim()), x(this->dim());
-    ;
-
     // Tecplot header info
     fprintf(file_pt, "%s", this->tecplot_zone_string(nplot).c_str());
 
+    // Number of coordinates
+    unsigned dim = this->dim();
+    // Number of unknowns
+    unsigned n_unknown = 3;
+
     // Loop over plot points
-    Vector<double> u(this->required_nvalue(0), 0.0);
     unsigned num_plot_points = this->nplot_points(nplot);
     for (unsigned iplot = 0; iplot < num_plot_points; iplot++)
     {
       // Get local coordinates of plot point
+      Vector<double> s(dim);
       this->get_s_plot(iplot, nplot, s);
 
-      // Get x position as Vector
+      // Output the interpolated global coords
+      Vector<double> x(dim, 0.0);
       interpolated_x(s, x);
-
-      for (unsigned i = 0; i < this->dim(); i++)
+      for (unsigned i = 0; i < dim; i++)
       {
         fprintf(file_pt, "%g ", x[i]);
       }
-      u = interpolated_u_foeppl_von_karman(s);
-      fprintf(file_pt, "%g \n", u[0]);
+
+      // Output the interpolated unknowns
+      Vector<double> interpolated_vals(n_unknown,0.0);
+      interpolated_vals = interpolated_fvk_disp_and_deriv(s);
+      for (unsigned i = 0; i < n_unknown; i++)
+      {
+	fprintf(file_pt, "%g \n", interpolated_vals[i]);
+      }
     }
 
     // Write tecplot footer (e.g. FE connectivity lists)
@@ -1307,8 +1486,7 @@ namespace oomph
   }
 
 
-  // [zdec] This is also called to output the pressure.
-  // [TODO] Needs renaming.
+
   //======================================================================
   /// Output exact solution
   ///
@@ -1322,11 +1500,14 @@ namespace oomph
     const unsigned& nplot,
     FiniteElement::SteadyExactSolutionFctPt exact_soln_pt)
   {
+    // Number of coordinates
+    unsigned dim = this->dim();
+
     // Vector of local coordinates
-    Vector<double> s(this->dim());
+    Vector<double> s(dim);
 
     // Vector for coordintes
-    Vector<double> x(this->dim());
+    Vector<double> x(dim);
 
     // Tecplot header info
     outfile << this->tecplot_zone_string(nplot);
@@ -1356,7 +1537,7 @@ namespace oomph
       (*exact_soln_pt)(x, exact_soln);
 
       // Output x,y,...,u_exact
-      for (unsigned i = 0; i < this->dim(); i++)
+      for (unsigned i = 0; i < dim; i++)
       {
         outfile << x[i] << " ";
       }
@@ -1379,7 +1560,7 @@ namespace oomph
   /// Solution is provided via function pointer.
   /// Plot error at a given number of plot points.
   ///
-  /// HERE THIS MAY BE SUPERFLUOUS NOW
+  /// [zdec] Is this function necessary?
   //======================================================================
   void FoepplVonKarmanEquations::compute_error_in_deflection(
     std::ostream& outfile,
@@ -1457,7 +1638,7 @@ namespace oomph
 
       // Get FE function value
       Vector<double> u_fe(this->required_nvalue(0), 0.0);
-      u_fe = interpolated_u_foeppl_von_karman(s);
+      u_fe = interpolated_fvk_disp_and_deriv(s);
 
       // Get exact solution at this point
       (*exact_soln_pt)(x, exact_soln);
@@ -1576,7 +1757,7 @@ namespace oomph
 
       // Get FE function value
       Vector<double> u_fe(this->required_nvalue(0), 0.0);
-      u_fe = interpolated_u_foeppl_von_karman(s);
+      u_fe = interpolated_fvk_disp_and_deriv(s);
 
       // Get exact solution at this point
       (*exact_soln_pt)(x, exact_soln);

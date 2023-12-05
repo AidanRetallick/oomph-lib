@@ -38,8 +38,360 @@
 #include "../generic/subparametric_Telement.h"
 #include "src/generic/oomph_definitions.h"
 
+// [zdec] TODO:
+// -- Move function definitions to .cc
+// -- Optimise basis and test functions by not retrieving d and d2 basis every
+// time
+// --
+
 namespace oomph
 {
+  //===start of rotation helper class=========================================
+  /// Helper class to contain all the rotation information in the element.
+  class RotatedBoundaryHelper
+  {
+  public:
+    /// Constructor: just initialise the member data to their defaults (zeros)
+    RotatedBoundaryHelper(FiniteElement* const& parent_element_pt)
+      : Parent_element_pt(parent_element_pt),
+	Nnode(Parent_element_pt->nvertex_node()),
+	Boundary_coordinate_of_node(3, 0.0),
+	Nodal_boundary_parametrisation_pt(3, 0),
+	Rotation_matrix_at_node(3, DenseMatrix<double>(6, 6, 0.0))
+    {
+    }
+
+    /// Destructor
+    ~RotatedBoundaryHelper() {}
+
+    CurvilineGeomObject* nodal_boundary_parametrisation_pt(
+      const unsigned& j_node)
+    {
+      return Nodal_boundary_parametrisation_pt[j_node];
+    }
+
+
+    /// Add a new boundary parametrisation to nodes all the nodes in the
+    /// vector node_on_boundary
+    void set_nodal_boundary_parametrisation(
+      const Vector<unsigned>& node_on_boundary,
+      const Vector<double>& boundary_coord_of_node,
+      CurvilineGeomObject* const& boundary_parametrisation_pt)
+    {
+      // Loop over all the nodes in node_on_boundary and add the boundary
+      // pointer to their vector of boundaries
+      unsigned n_node = node_on_boundary.size();
+      for (unsigned j = 0; j < n_node; j++)
+      {
+        // The j-th node on the boundary
+        unsigned j_node = node_on_boundary[j];
+
+        // Set the boundary parametrisation data pointer for this node
+        Nodal_boundary_parametrisation_pt[j_node] = boundary_parametrisation_pt;
+
+        // Set the coordinate of node j on this boundary
+        Boundary_coordinate_of_node[j_node] = boundary_coord_of_node[j];
+
+        update_rotation_matrices();
+      } // end of loop over nodes in node_on_boundary [j]
+    } // end of set_nodal_boundary_parametrisation()
+
+
+    /// Update all rotation matrices (checks if they are needed unless flag is
+    /// true)
+    void update_rotation_matrices()
+    {
+      // [zdec] hard coded the three vertex nodes
+      unsigned n_vertex = 3;
+      // Loop over each vertex
+      for (unsigned j_node = 0; j_node < n_vertex; j_node++)
+      {
+        // If this node does not have a parametrisation (the pointer is still
+        // null) skip over it, otherwise we go on to fill out the rotation
+        // matrix
+        if (!nodal_boundary_parametrisation_pt(j_node))
+        {
+          continue;
+        }
+
+        // Initialise the two basis vectors and their jacobians
+        Vector<Vector<double>> bi(2, Vector<double>(2, 0.0));
+        Vector<DenseMatrix<double>> dbidx(2, DenseMatrix<double>(2, 2, 0.0));
+
+        // Our new coordinate system:
+        //     (l, s)=(normal component, tangent component)
+        // which we define in terms of basis vectors (rescaled)
+        //     ni=dxi/dl / |n|           <-- Jacobian col 1
+        //     ti=dxi/ds / |t|           <-- Jacobian col 2
+        // and their derivatives
+        //     dnidxj=d/dxj(dxi/dl / |n|) <-- Hessian `col' 1
+        //     dtidxj=d/dxj(dxi/ds / |t|) <-- Hessian `col' 2
+
+        // [zdec] we use i and j for brevity
+        // but it should be alpha & beta
+        // Need to write up how the transformation is done
+
+        // Storage for our basis and derivatives
+        Vector<double> ni(2, 0.0);
+        Vector<double> ti(2, 0.0);
+        Vector<double> dnids(2, 0.0);
+        Vector<double> dtids(2, 0.0);
+
+        // All tensors assumed evaluated on the boundary
+        // Jacobian of inverse mapping
+        DenseMatrix<double> jac_inv(2, 2, 0.0);
+        // Hessian of mapping [zdec] (not needed because...)
+        Vector<DenseMatrix<double>> hess(2, DenseMatrix<double>(2, 2, 0.0));
+        // Hessian of inverse mapping [zdec] (...this can be found by
+        // hand)
+        Vector<DenseMatrix<double>> hess_inv(2, DenseMatrix<double>(2, 2, 0.0));
+
+        // The basis is defined in terms of the boundary parametrisation
+        Vector<double> boundary_coord = {Boundary_coordinate_of_node[j_node]};
+        CurvilineGeomObject* boundary_pt =
+          Nodal_boundary_parametrisation_pt[j_node];
+        Vector<double> x(2, 0.0);
+        Vector<double> dxids(2, 0.0);
+        Vector<double> d2xids2(2, 0.0);
+
+        // Get position (debug)
+        boundary_pt->position(boundary_coord, x);
+        // Get tangent vector
+        boundary_pt->dposition(boundary_coord, dxids);
+        // Get second derivative
+        boundary_pt->d2position(boundary_coord, d2xids2);
+
+        double mag_t = sqrt(dxids[0] * dxids[0] + dxids[1] * dxids[1]);
+        // ti is the normalised tangent vector
+        ti[0] = dxids[0] / mag_t;
+        ti[1] = dxids[1] / mag_t;
+        // Derivative of (normalised) tangent
+        dtids[0] = d2xids2[0] / std::pow(mag_t, 2) -
+                   (dxids[0] * d2xids2[0] + dxids[1] * d2xids2[1]) * dxids[0] /
+                     std::pow(mag_t, 4);
+        dtids[1] = d2xids2[1] / std::pow(mag_t, 2) -
+                   (dxids[0] * d2xids2[0] + dxids[1] * d2xids2[1]) * dxids[1] /
+                     std::pow(mag_t, 4);
+        // n = (t x e_z) implies
+        ni[0] = ti[1];
+        ni[1] = -ti[0];
+        // Same for dnids
+        dnids[0] = dtids[1];
+        dnids[1] = -dtids[0];
+
+        // Need inverse of mapping to calculate ds/dxi ----------------
+        //   /  dx/dl  dx/ds  \ -1  ___  __1__ /  dy/ds -dx/ds \ .
+        //   \  dy/dl  dy/ds  /     ---   det  \ -dy/dl  dx/dl /
+        //
+        //                          ___  /  dl/dx  dl/dy  \ .
+        //                          ---  \  ds/dx  ds/dy  /
+        //
+        // Fill out inverse of Jacobian
+        double det = (ni[0] * ti[1] - ni[1] * ti[0]);
+        jac_inv(0, 0) = ti[1] / det;
+        jac_inv(0, 1) = -ti[0] / det;
+        jac_inv(1, 0) = -ni[1] / det;
+        jac_inv(1, 1) = ni[0] / det;
+
+        // Fill out the Hessian
+        // (unneeded -- can calculate the inverse components by hand)
+        for (unsigned alpha = 0; alpha < 2; alpha++)
+        {
+          // hess[alpha](0,0) = 0.0;
+          hess[alpha](0, 1) = dnids[alpha];
+          hess[alpha](1, 0) = dnids[alpha];
+          hess[alpha](1, 1) = dtids[alpha];
+        }
+
+        // Fill out inverse of Hessian
+        // H^{-1}abg = J^{-1}ad Hdez J^{-1}eb J^{-1}zg
+        for (unsigned alpha = 0; alpha < 2; alpha++)
+        {
+          for (unsigned beta = 0; beta < 2; beta++)
+          {
+            for (unsigned gamma = 0; gamma < 2; gamma++)
+            {
+              for (unsigned alpha2 = 0; alpha2 < 2; alpha2++)
+              {
+                for (unsigned beta2 = 0; beta2 < 2; beta2++)
+                {
+                  for (unsigned gamma2 = 0; gamma2 < 2; gamma2++)
+                  {
+                    hess_inv[alpha](beta, gamma) -=
+                      jac_inv(alpha, alpha2) * hess[alpha2](beta2, gamma2) *
+                      jac_inv(beta2, beta) * jac_inv(gamma2, gamma);
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // Fill in the rotation matrix using the new basis
+        fill_in_rotation_matrix_at_node_with_basis(j_node, jac_inv, hess_inv);
+
+
+        // // [zdec] debug
+        // std::ofstream jac_and_hess;
+        // jac_and_hess.open("jac_and_hess_new.csv", std::ios_base::app);
+        // jac_and_hess << "Jacobian inverse:" << std::endl
+        // 		   << bi[0][0] << " " << bi[0][1] << std::endl
+        // 		   << bi[1][0] << " " << bi[1][1] << std::endl
+        // 		   << "Hessian inverse [x]:" << std::endl
+        // 		   << Dbi[0](0,0) << " " << Dbi[0](0,1) << std::endl
+        // 		   << Dbi[0](1,0) << " " << Dbi[0](1,1) << std::endl
+        // 		   << "Hessian inverse [y]:" << std::endl
+        // 		   << Dbi[1](0,0) << " " << Dbi[1](0,1) << std::endl
+        // 		   << Dbi[1](1,0) << " " << Dbi[1](1,1) << std::endl <<
+        // std::endl;
+
+
+        // // [zdec] debug
+        // std::ofstream jac_and_hess;
+        // jac_and_hess.open("jac_and_hess_new.csv", std::ios_base::app);
+        // jac_and_hess << "Jacobian inverse:" << std::endl
+        //              << jac_inv(0, 0) << " " << jac_inv(0, 1) << std::endl
+        //              << jac_inv(1, 0) << " " << jac_inv(1, 1) << std::endl
+        //              << "Hessian inverse [x]:" << std::endl
+        //              << hess_inv[0](0, 0) << " " << hess_inv[0](0, 1)
+        //              << std::endl
+        //              << hess_inv[0](1, 0) << " " << hess_inv[0](1, 1)
+        //              << std::endl
+        //              << "Hessian inverse [y]:" << std::endl
+        //              << hess_inv[1](0, 0) << " " << hess_inv[1](0, 1)
+        //              << std::endl
+        //              << hess_inv[1](1, 0) << " " << hess_inv[1](1, 1)
+        //              << std::endl
+        //              << std::endl;
+        // jac_and_hess.close();
+
+        // // [zdec] debug
+        // std::ofstream debug_stream;
+        // debug_stream.open("norm_and_tan.dat", std::ios_base::app);
+        // debug_stream << x[0] << " " << x[1] << " " << ni[0] << " " << ni[1]
+        //              << " " << ti[0] << " " << ti[1] << " " << dnids[0] << " "
+        //              << dnids[1] << " " << dtids[0] << " " << dtids[1] << " "
+        //              << d2xids2[0] << " " << d2xids2[1] << std::endl;
+        // debug_stream.close();
+
+      } // end loop over vertices
+    } // end of update_rotation_matrices()
+
+
+    /// Access function to fill out rot_mat using rotation matrix
+    void get_rotation_matrix_at_node(const unsigned& j_node,
+                                     DenseMatrix<double>& rot_mat)
+    {
+      rot_mat = Rotation_matrix_at_node[j_node];
+    }
+
+  private:
+    /// Helper function to fill in the rotation matrix for a given basis
+    void fill_in_rotation_matrix_at_node_with_basis(
+      const unsigned& j_node,
+      const DenseMatrix<double>& jac_inv,
+      const Vector<DenseMatrix<double>>& hess_inv)
+    {
+      // Rotation matrix, b constructed using submatrices b1, b12, b22
+      DenseMatrix<double> b1(2, 2, 0.0), b22(3, 3, 0.0), b12(2, 3, 0.0);
+
+      // Fill in the submatrices
+      // Loop over the rotated first derivatives
+      for (unsigned mu = 0; mu < 2; mu++)
+      {
+        // Loop over the unrotated first derivatives
+        for (unsigned alpha = 0; alpha < 2; alpha++)
+        {
+          // Fill in b1 - the Jacobian
+          // Fill in the affine rotation of the first derivatives
+          b1(mu, alpha) = jac_inv(mu, alpha);
+
+          // Loop over unrotated second derivatives
+          for (unsigned beta = 0; beta < 2; ++beta)
+          {
+            // Avoid double counting the cross derivative
+            if (alpha <= beta)
+            {
+              // Define column index
+              const unsigned col = alpha + beta;
+
+              // Fill in the non-affine part of the rotation of the first
+              // derivatives
+              b12(mu, col) += hess_inv[mu](alpha, beta);
+              // [zdec] debug mixed derivative -- add extra
+              if (alpha < beta)
+              {
+                // b12(mu, col) -= hess_inv[mu](alpha, beta);
+              }
+              // Loop over the rotated second derivatives
+              for (unsigned nu = 0; nu < 2; nu++)
+              {
+                // // Avoid double counting the cross derivative
+                // if (mu <= nu)
+                {
+                  // Fill in b22 - the Affine part of the Jacobian derivative
+                  // Redefine row index for the next submatrix
+                  unsigned row_b22 = mu + nu;
+                  // Fill in the affine part of the rotation of the second
+                  // derivatives [zdec] if( beta>= alpha) ?
+                  b22(row_b22, col) += jac_inv(mu, alpha) * jac_inv(nu, beta);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Fill in the submatrices to the full (6x6) matrix
+      Rotation_matrix_at_node[j_node](0, 0) = 1.0;
+      // Fill in b1 --- the affine contribution to rotation of the
+      // first derivatives
+      for (unsigned i = 0; i < 2; ++i)
+      {
+        for (unsigned j = 0; j < 2; ++j)
+        {
+          Rotation_matrix_at_node[j_node](1 + i, 1 + j) = b1(i, j);
+        }
+      }
+      // Fill in b21 --- the non-affine (second derivative dependent)
+      // rotation of the first derivatives
+      for (unsigned i = 0; i < 2; ++i)
+      {
+        for (unsigned j = 0; j < 3; ++j)
+        {
+          Rotation_matrix_at_node[j_node](1 + i, 3 + j) = b12(i, j);
+        }
+      }
+      // Fill in b22 --- the rotation of the second derivatives
+      for (unsigned i = 0; i < 3; ++i)
+      {
+        for (unsigned j = 0; j < 3; ++j)
+        {
+          Rotation_matrix_at_node[j_node](3 + i, 3 + j) = b22(i, j);
+        }
+      }
+    } // end fill_in_rotation_matrix_at_node_with_basis
+
+    /// Pointer to the `parent' finite element which this is a helper force
+    FiniteElement* Parent_element_pt;
+
+    /// The number of nodes (that we store rotation data for) in the fvk element
+    /// that uses this helper
+    unsigned Nnode;
+
+    /// Vector containing boundary parametrised location for each node
+    Vector<double> Boundary_coordinate_of_node;
+
+    /// Vector containing boundary parametrisation at each node
+    Vector<CurvilineGeomObject*> Nodal_boundary_parametrisation_pt;
+
+    /// Vector containing <rotation matrix at each node>
+    Vector<DenseMatrix<double>> Rotation_matrix_at_node;
+  };
+  //---end of rotation helper class-------------------------------------------
+
+
+
   //============================================================================
   /// FoepplVonKarmanC1CurvableBellElement elements are a subparametric scheme
   /// with  linear Lagrange interpolation for approximating the geometry and
@@ -89,9 +441,9 @@ namespace oomph
     /// FoepplVonKarman equations
     FoepplVonKarmanC1CurvableBellElement()
       : CurvableBellElement<NNODE_1D>(Nfield, Field_is_bell_interpolated),
-        FoepplVonKarmanEquations(),
-        // Rotated_basis_fct_pt(0), // [zdec] old rotation
-        Nnodes_to_rotate(0)
+        FoepplVonKarmanEquations()
+        // Rotated_basis_fct_pt(0) // [zdec] old rotation
+        // Nnodes_to_rotate(0)
     {
       // Use the higher order integration scheme
       TGauss<2, 4>* new_integral_pt = new TGauss<2, 4>;
@@ -123,578 +475,7 @@ namespace oomph
       BrokenCopy::broken_assign("FoepplVonKarmanC1CurvableBellElement");
     }
 
-    // // [zdec] old rotation -- delete
-    // /// Function pointer to basis vectors function which sets  basis vectors
-    // /// b1 and b2 (which are in general functions of x)
-    // typedef void (*BasisVectorsFctPt)(const Vector<double>& x,
-    //                                   Vector<double>& b1,
-    //                                   Vector<double>& b2,
-    //                                   DenseMatrix<double>& db1,
-    //                                   DenseMatrix<double>& db2);
 
-    // [zdec] Note for Matthias: this current helper class works for arbitrary
-    // boundary nodes on curviline boundaries by storing up to two
-    // CurvilinGeomObjects which contain all the necessary parametrisation info.
-    // This does not work for straight boundaries where no such object exists
-    // however.
-
-    //---start of rotation helper class-----------------------------------------
-    /// Helper class to contain all the rotation information in the element.
-    class RotatedBoundaryHelper
-    {
-    public:
-      // [zdec] Do we care that 'Nnode=3' is hard coded?
-      /// Constructor: just initialise the member data to their defaults (zeros)
-      RotatedBoundaryHelper(FiniteElement* const& parent_element_pt)
-        : Parent_element_pt(parent_element_pt),
-          Boundary_coordinate_of_node(3, 0.0),
-          Nodal_boundary_parametrisation_pt(3, 0),
-          Rotation_matrix_at_node(3, DenseMatrix<double>(6, 6, 0.0))
-      {
-      }
-
-      /// Destructor
-      ~RotatedBoundaryHelper() {}
-
-      CurvilineGeomObject* get_nodal_boundary_parametrisation(
-	const unsigned& j_node)
-      {
-	return Nodal_boundary_parametrisation_pt[j_node];
-      }
-
-
-      /// Add a new boundary parametrisation to nodes all the nodes in the
-      /// vector node_on_boundary
-      void set_nodal_boundary_parametrisation(
-        const Vector<unsigned>& node_on_boundary,
-        const Vector<double>& boundary_coord_of_node,
-        CurvilineGeomObject* const& boundary_parametrisation_pt)
-      {
-        // Loop over all the nodes in node_on_boundary and add the boundary
-        // pointer to their vector of boundaries
-        unsigned n_node = node_on_boundary.size();
-        for (unsigned j = 0; j < n_node; j++)
-        {
-          unsigned j_node = node_on_boundary[j];
-
-	  // [zdec] old warning for old vertex handling
-	  // #ifdef PARANOID
-          // // A node can be on a maximum of two boundaries
-          // // (if we already have more throw an error)
-	  // // [zdec] this error string doesn't work
-	  // // [zdec] 0 because all nodes should now be on at most one boundary
-          // if (n_boundary > 1)
-          // {
-          //   std::stringstream error_stringstream;
-
-          //   error_stringstream << "Nodes cannot appear on more than two "
-          //                      << "boundaries. An attempt is being made to "
-          //                      << "assign " << j_node << " to a "
-          //                      << n_boundary + 1 << "-th boundary."
-          //                      << std::endl;
-
-          //   throw OomphLibError(
-          //     error_stringstream.str(),
-	  //     OOMPH_CURRENT_FUNCTION,
-	  //     OOMPH_EXCEPTION_LOCATION);
-          // }
-	  // #endif
-
-          // IMPORTANT
-          // If we already have a parametrisation, we need to chack that the
-          // new boundary parametrisation isn't equivalent at this point
-          // (i.e. the parametrisation is not continuous across the two
-          // boundaries)
-
-          // // [zdec] !!! what if t1==t2 but dt1/ds1!=dt2/ds2 ???
-          // // Also, need to normalise for different parametrisation velocities
-
-          // // Tolerance to determine whether two tangents are different
-          // double diff_tol = 1.0e-8;
-          // if (n_boundary == 1)
-          // {
-          //   // Get the parametrisation for the first boundary
-          //   CurvilineGeomObject* old_boundary_parametrisation_pt =
-          //     Nodal_boundary_parametrisation_pt[j_node][0];
-          //   Vector<double> old_boundary_coord = {
-          //     Boundary_coordinate_of_node[j_node][0]};
-
-          //   // Get the tangent vector for the first parametrisation
-          //   Vector<double> old_tangent(2, 0.0);
-          //   old_boundary_parametrisation_pt->dposition(old_boundary_coord,
-          //                                              old_tangent);
-
-          //   // Get the tangent vector for the second parametrisation
-          //   Vector<double> new_tangent(2, 0.0);
-          //   boundary_parametrisation_pt->dposition({boundary_coord_of_node[j]},
-          //                                          new_tangent);
-
-          //   // Compare the two
-          //   Vector<double> tangent_difference(2, 0.0);
-          //   tangent_difference[0] = new_tangent[0] - old_tangent[0];
-          //   tangent_difference[1] = new_tangent[1] - old_tangent[1];
-          //   double tangent_difference_norm =
-          //     tangent_difference[0] * tangent_difference[0] +
-          //     tangent_difference[1] * tangent_difference[1];
-
-          //   // If the tangents are the same (within tolerance) don't add this
-          //   // parametrisation
-          //   if (tangent_difference_norm < diff_tol)
-          //   {
-          //     add_boundary_parametrisation = false;
-          //     oomph_info << "Boundary parametrisations produce tangents ("
-          //                << old_tangent[0] << ", " << old_tangent[1]
-          //                << ") and (" << new_tangent[0] << ", "
-          //                << new_tangent[1] << ") which are equal enough that "
-          //                << "we consider the boundary continuous." << std::endl;
-          //   }
-          // }
-
-          // Set the boundary parametrisation data pointer for this node
-	  Nodal_boundary_parametrisation_pt[j_node] =
-	    boundary_parametrisation_pt;
-
-	  // Set the coordinate of node j on this boundary
-	  Boundary_coordinate_of_node[j_node] =
-	    boundary_coord_of_node[j];
-
-	  update_rotation_matrices();
-	} // end of loop over nodes in node_on_boundary [j]
-      } // end of set_nodal_boundary_parametrisation()
-
-
-      /// Update all rotation matrices (checks if they are needed unless
-      /// flag is true)
-      void update_rotation_matrices()
-      {
-        // [zdec] hard coded the three vertex nodes
-        unsigned n_vertex = 3;
-        // Loop over each vertex
-        for (unsigned j_node = 0; j_node < n_vertex; j_node++)
-        {
-	  // If this node does not have a parametrisation (the pointer is still
-	  // null) skip over it, otherwise we go on to fill out the rotation
-	  // matrix
-	  if(!get_nodal_boundary_parametrisation(j_node))
-	  {
-	    continue;
-	  }
-
-          // Initialise the two basis vectors and their jacobians
-          Vector<Vector<double>> bi(2, Vector<double>(2, 0.0));
-          Vector<DenseMatrix<double>> dbidx(2, DenseMatrix<double>(2, 2, 0.0));
-
-	  // Our new coordinate system:
-	  //     (l, s)=(normal component, tangent component)
-	  // which we define in terms of basis vectors (rescaled)
-	  //     ni=dxi/dl / |n|           <-- Jacobian col 1
-	  //     ti=dxi/ds / |t|           <-- Jacobian col 2
-	  // and their derivatives
-	  //     dnidxj=d/dxj(dxi/dl / |n|) <-- Hessian `col' 1
-	  //     dtidxj=d/dxj(dxi/ds / |t|) <-- Hessian `col' 2
-
-          // [zdec] we use i and j for brevity
-          // but it should be alpha & beta
-          // Need to write up how the transformation is done
-
-          // Storage for our basis and derivatives
-          Vector<double> ni(2, 0.0);
-          Vector<double> ti(2, 0.0);
-          Vector<double> dnids(2, 0.0);
-          Vector<double> dtids(2, 0.0);
-
-          // All tensors assumed evaluated on the boundary
-          // Jacobian of inverse mapping
-          DenseMatrix<double> jac_inv(2, 2, 0.0);
-          // Hessian of mapping [zdec] (not needed because...)
-          Vector<DenseMatrix<double>> hess(2, DenseMatrix<double>(2, 2, 0.0));
-          // Hessian of inverse mapping [zdec] (...this can be found by
-          // hand)
-          Vector<DenseMatrix<double>> hess_inv(2,
-                                               DenseMatrix<double>(2, 2, 0.0));
-
-          // The basis is defined in terms of the boundary parametrisation
-          Vector<double> boundary_coord = {
-            Boundary_coordinate_of_node[j_node]};
-          CurvilineGeomObject* boundary_pt =
-            Nodal_boundary_parametrisation_pt[j_node];
-          Vector<double> x(2, 0.0);
-          Vector<double> dxids(2, 0.0);
-          Vector<double> d2xids2(2, 0.0);
-
-          // Get position (debug)
-          boundary_pt->position(boundary_coord, x);
-          // Get tangent vector
-          boundary_pt->dposition(boundary_coord, dxids);
-          // Get second derivative
-          boundary_pt->d2position(boundary_coord, d2xids2);
-
-          double mag_t = sqrt(dxids[0] * dxids[0] + dxids[1] * dxids[1]);
-          // ti is the normalised tangent vector
-          ti[0] = dxids[0] / mag_t;
-          ti[1] = dxids[1] / mag_t;
-          // Derivative of (normalised) tangent
-          dtids[0] = d2xids2[0] / std::pow(mag_t, 2);
-          // - (dxids[0]*d2xids2[0]+dxids[1]*d2xids2[1]) * dxids[0]
-          // / std::pow(mag_t,4);
-          dtids[1] = d2xids2[1] / std::pow(mag_t, 2);
-          // - (dxids[0]*d2xids2[0]+dxids[1]*d2xids2[1]) * dxids[1]
-          // / std::pow(mag_t,4);
-          // ni = (t x e_z) implies
-          ni[0] = ti[1];
-          ni[1] = -ti[0];
-          // Same for dnids
-          dnids[0] = dtids[1];
-          dnids[1] = -dtids[0];
-
-          // Need inverse of mapping to calculate ds/dxi ----------------
-          //   /  dx/dl  dx/ds  \ -1  ___   _1_  /  dy/ds -dx/ds \ .
-          //   \  dy/dl  dy/ds  /     ---   det  \ -dy/dl  dx/dl /
-          //
-          //                          ___  /  dl/dx  dl/dy  \ .
-          //                          ---  \  ds/dx  ds/dy  /
-          //
-          // Fill out inverse of Jacobian
-          double det = (ni[0] * ti[1] - ni[1] * ti[0]);
-          jac_inv(0, 0) = ti[1] / det;
-          jac_inv(0, 1) = -ti[0] / det;
-          jac_inv(1, 0) = -ni[1] / det;
-          jac_inv(1, 1) = ni[0] / det;
-
-          // Fill out the Hessian
-          // (unneeded -- can calculate the inverse components by hand)
-          for (unsigned alpha = 0; alpha < 2; alpha++)
-          {
-            // hess[alpha](0,0) = 0.0;
-            hess[alpha](0, 1) = dnids[alpha];
-            hess[alpha](1, 0) = dnids[alpha];
-            hess[alpha](1, 1) = dtids[alpha];
-          }
-
-          // Fill out inverse of Hessian
-          // H^{-1}abg = J^{-1}ad Hdez J^{-1}eb J^{-1}zg
-          for (unsigned alpha = 0; alpha < 2; alpha++)
-          {
-            for (unsigned beta = 0; beta < 2; beta++)
-            {
-              for (unsigned gamma = 0; gamma < 2; gamma++)
-              {
-                for (unsigned alpha2 = 0; alpha2 < 2; alpha2++)
-                {
-                  for (unsigned beta2 = 0; beta2 < 2; beta2++)
-                  {
-                    for (unsigned gamma2 = 0; gamma2 < 2; gamma2++)
-                    {
-                      hess_inv[alpha](beta, gamma) -=
-                        jac_inv(alpha, alpha2) * hess[alpha2](beta2, gamma2) *
-                        jac_inv(beta2, beta) * jac_inv(gamma2, gamma);
-                    }
-                  }
-                }
-              }
-            }
-          }
-
-          // // [zdec] debug
-          // std::ofstream jac_and_hess;
-          // jac_and_hess.open("jac_and_hess_new.csv", std::ios_base::app);
-          // jac_and_hess << "Jacobian inverse:" << std::endl
-          // 		   << bi[0][0] << " " << bi[0][1] << std::endl
-          // 		   << bi[1][0] << " " << bi[1][1] << std::endl
-          // 		   << "Hessian inverse [x]:" << std::endl
-          // 		   << Dbi[0](0,0) << " " << Dbi[0](0,1) << std::endl
-          // 		   << Dbi[0](1,0) << " " << Dbi[0](1,1) << std::endl
-          // 		   << "Hessian inverse [y]:" << std::endl
-          // 		   << Dbi[1](0,0) << " " << Dbi[1](0,1) << std::endl
-          // 		   << Dbi[1](1,0) << " " << Dbi[1](1,1) << std::endl <<
-          // std::endl;
-
-
-          // [zdec] debug
-          std::ofstream jac_and_hess;
-          jac_and_hess.open("jac_and_hess_new.csv", std::ios_base::app);
-          jac_and_hess << "Jacobian inverse:" << std::endl
-                       << jac_inv(0, 0) << " " << jac_inv(0, 1) << std::endl
-                       << jac_inv(1, 0) << " " << jac_inv(1, 1) << std::endl
-                       << "Hessian inverse [x]:" << std::endl
-                       << hess_inv[0](0, 0) << " " << hess_inv[0](0, 1)
-                       << std::endl
-                       << hess_inv[0](1, 0) << " " << hess_inv[0](1, 1)
-                       << std::endl
-                       << "Hessian inverse [y]:" << std::endl
-                       << hess_inv[1](0, 0) << " " << hess_inv[1](0, 1)
-                       << std::endl
-                       << hess_inv[1](1, 0) << " " << hess_inv[1](1, 1)
-                       << std::endl
-                       << std::endl;
-          jac_and_hess.close();
-
-          // [zdec] debug
-          std::ofstream debug_stream;
-          debug_stream.open("norm_and_tan.dat", std::ios_base::app);
-          debug_stream << x[0] << " " << x[1] << " " << ni[0] << " " << ni[1]
-                       << " " << ti[0] << " " << ti[1] << " " << dnids[0] << " "
-                       << dnids[1] << " " << dtids[0] << " " << dtids[1] << " "
-                       << d2xids2[0] << " " << d2xids2[1] << std::endl;
-          debug_stream.close();
-
-          // Fill in the rotation matrix using the new basis
-          fill_in_rotation_matrix_at_node_with_basis(j_node, jac_inv, hess_inv);
-
-	  // [zdec] old corner handling, now use duped nodes in a corner
-          //   // Node is at a corner, rotate to the tangent1-tangent2
-          //   // coordinates
-          // case 2:
-          //   {
-          //     // // [zdec] Throw an error because we are doing node
-          //     duplication
-          //     // // now. All the length two vectors want swapping for length
-          //     1
-          //     // // (scalar) values as each node should only be on one
-          //     boundary.
-          //     // throw OomphLibError("You shouldn't be here! There should
-          //     only be one boundary per node.",
-          //     // 			  OOMPH_CURRENT_FUNCTION,
-          //     // 			  OOMPH_EXCEPTION_LOCATION);
-
-          //     // Our new coordinate system:
-          //     //     (l, s)=(normal component, tangent component)
-          //     // which we define in terms of basis vectors (rescaled)
-          //     //     ni=dxi/dl / |n|           <-- Jacobian col 1
-          //     //     ti=dxi/ds / |t|           <-- Jacobian col 2
-          //     // and their derivatives
-          //     //     dnidxj=d/dxj(dxi/dl / |n|) <-- Hessian `col' 1
-          //     //     dtidxj=d/dxj(dxi/ds / |t|) <-- Hessian `col' 2
-
-          //     // [zdec] we use i and j for brevity
-          //     // but it should be alpha & beta
-          //     // Need to write up how the transformation is done
-
-          //     // Storage for our basis and derivatives
-          //     Vector<double> t1i(2, 0.0);
-          //     Vector<double> t2i(2, 0.0);
-          //     Vector<double> dt1ids1(2, 0.0);
-          //     Vector<double> dt2ids2(2, 0.0);
-
-          //     // All tensors assumed evaluated on the boundary
-          //     // Jacobian of inverse mapping
-          //     DenseMatrix<double> jac_inv(2, 2, 0.0);
-          //     // Hessian of mapping
-          //     Vector<DenseMatrix<double>> hess(2,
-          //                                      DenseMatrix<double>(2, 2, 0.0));
-          //     // Hessian of inverse mapping
-          //     Vector<DenseMatrix<double>> hess_inv(
-          //       2, DenseMatrix<double>(2, 2, 0.0));
-
-          //     // The basis is defined in terms of the two boundary
-          //     // parametrisation
-          //     Vector<double> boundary1_coord = {
-          //       Boundary_coordinate_of_node[j_node][0]};
-          //     Vector<double> boundary2_coord = {
-          //       Boundary_coordinate_of_node[j_node][1]};
-          //     CurvilineGeomObject* boundary1_pt =
-          //       Nodal_boundary_parametrisation_pt[j_node][0];
-          //     CurvilineGeomObject* boundary2_pt =
-          //       Nodal_boundary_parametrisation_pt[j_node][1];
-          //     Vector<double> x1(2, 0.0);
-          //     Vector<double> x2(2, 0.0);
-          //     Vector<double> dx1ids1(2, 0.0);
-          //     Vector<double> dx2ids2(2, 0.0);
-          //     Vector<double> d2x1ids12(2, 0.0);
-          //     Vector<double> d2x2ids22(2, 0.0);
-
-          //     // Get positions (debug)
-          //     boundary1_pt->position(boundary1_coord, x1);
-          //     boundary2_pt->position(boundary2_coord, x2);
-          //     // Get tangent vectors
-          //     boundary1_pt->dposition(boundary1_coord, dx1ids1);
-          //     boundary2_pt->dposition(boundary2_coord, dx2ids2);
-          //     // Get second derivatives
-          //     boundary1_pt->d2position(boundary1_coord, d2x1ids12);
-          //     boundary2_pt->d2position(boundary2_coord, d2x2ids22);
-
-          //     double mag_t = 1.0; // sqrt(dxids[0]*dxids[0]+dxids[1]*dxids[1]);
-          //     // t1i is the first normalised tangent vector
-          //     t1i[0] = dx1ids1[0] / mag_t;
-          //     t1i[1] = dx1ids1[1] / mag_t;
-          //     // Derivative of first tangent (not normalised)
-          //     dt1ids1[0] = d2x1ids12[0];
-          //     dt1ids1[1] = d2x1ids12[1];
-          //     // t2i is the second normalised tangent vector
-          //     t2i[0] = dx2ids2[0] / mag_t;
-          //     t2i[1] = dx2ids2[1] / mag_t;
-          //     // Derivative of first tangent (not normalised)
-          //     dt2ids2[0] = d2x2ids22[0];
-          //     dt2ids2[1] = d2x2ids22[1];
-
-          //     // Need inverse of mapping to calculate ds/dxi ----------------
-          //     //   /  dx/dl  dx/ds  \ -1  ___   _1_  /  dy/ds -dx/ds \ .
-          //     //   \  dy/dl  dy/ds  /     ---   det  \ -dy/dl  dx/dl /
-          //     //
-          //     //                          ___  /  dl/dx  dl/dy  \ .
-          //     //                          ---  \  ds/dx  ds/dy  /
-          //     //
-          //     // Fill out inverse of Jacobian
-          //     double det = (t1i[0] * t2i[1] - t2i[0] * t1i[1]);
-          //     jac_inv(0, 0) = t2i[1] / det;
-          //     jac_inv(0, 1) = -t2i[0] / det;
-          //     jac_inv(1, 0) = -t1i[1] / det;
-          //     jac_inv(1, 1) = t1i[0] / det;
-
-          //     // Fill out the Hessian
-          //     // (unneeded -- can calculate the inverse components by hand)
-          //     for (unsigned alpha = 0; alpha < 2; alpha++)
-          //     {
-          //       hess[alpha](0, 0) = dt1ids1[alpha];
-          //       // hess[alpha](0,1) = 0.0;
-          //       // hess[alpha](1,0) = 0.0;
-          //       hess[alpha](1, 1) = dt2ids2[alpha];
-          //     }
-
-          //     // Fill out inverse of Hessian
-          //     // H^{-1}abg = J^{-1}ad Hdez J^{-1}eb J^{-1}zg
-          //     for (unsigned alpha = 0; alpha < 2; alpha++)
-          //     {
-          //       for (unsigned beta = 0; beta < 2; beta++)
-          //       {
-          //         for (unsigned gamma = 0; gamma < 2; gamma++)
-          //         {
-          //           for (unsigned alpha2 = 0; alpha2 < 2; alpha2++)
-          //           {
-          //             for (unsigned beta2 = 0; beta2 < 2; beta2++)
-          //             {
-          //               for (unsigned gamma2 = 0; gamma2 < 2; gamma2++)
-          //               {
-          //                 hess_inv[alpha](beta, gamma) -=
-          //                   jac_inv(alpha, alpha2) *
-          //                   hess[alpha2](beta2, gamma2) * jac_inv(beta2, beta) *
-          //                   jac_inv(gamma2, gamma);
-          //               }
-          //             }
-          //           }
-          //         }
-          //       }
-          //     }
-
-          //     // Fill in the rotation matrix using the new basis
-          //     fill_in_rotation_matrix_at_node_with_basis(
-          //       j_node, jac_inv, hess_inv);
-          //     // [zdec] DEBUG
-          //     oomph_info << "ELEMENT " << Parent_element_pt << " is updated "
-          //                << std::endl;
-          //     break;
-          //   }
-
-        } // end loop over vertices
-      } // end of update_rotation_matrices()
-
-
-      /// Access function to fill out rot_mat using rotation matrix
-      void get_rotation_matrix_at_node(const unsigned& j_node,
-                                       DenseMatrix<double>& rot_mat)
-      {
-        rot_mat = Rotation_matrix_at_node[j_node];
-      }
-
-    private:
-      /// Helper function to fill in the rotation matrix for a given basis
-      void fill_in_rotation_matrix_at_node_with_basis(
-        const unsigned& j_node,
-        const DenseMatrix<double>& jac_inv,
-        const Vector<DenseMatrix<double>>& hess_inv)
-      {
-        // Rotation matrix, b constructed using submatrices b1, b12, b22
-        DenseMatrix<double> b1(2, 2, 0.0), b22(3, 3, 0.0), b12(2, 3, 0.0);
-
-        // Fill in the submatrices
-        // Loop over the rotated first derivatives
-        for (unsigned mu = 0; mu < 2; mu++)
-        {
-          // Loop over the unrotated first derivatives
-          for (unsigned alpha = 0; alpha < 2; alpha++)
-          {
-            // Fill in b1 - the Jacobian
-            // Fill in the affine rotation of the first derivatives
-            b1(mu, alpha) = jac_inv(mu, alpha);
-
-            // Loop over unrotated second derivatives
-            for (unsigned beta = 0; beta < 2; ++beta)
-            {
-              // Avoid double counting the cross derivative
-              if (alpha <= beta)
-              {
-                // Define column index
-                const unsigned col = alpha + beta;
-
-                // Fill in the non-affine part of the rotation of the first
-                // derivatives
-                b12(mu, col) += hess_inv[mu](alpha, beta);
-                // [zdec] debug mixed derivative -- add extra
-                if (alpha < beta)
-                {
-                  // b12(mu, col) -= hess_inv[mu](alpha, beta);
-                }
-                // Loop over the rotated second derivatives
-                for (unsigned nu = 0; nu < 2; nu++)
-                {
-                  // // Avoid double counting the cross derivative
-                  // if (mu <= nu)
-                  {
-                    // Fill in b22 - the Affine part of the Jacobian derivative
-                    // Redefine row index for the next submatrix
-                    unsigned row_b22 = mu + nu;
-                    // Fill in the affine part of the rotation of the second
-                    // derivatives [zdec] if( beta>= alpha) ?
-                    b22(row_b22, col) += jac_inv(mu, alpha) * jac_inv(nu, beta);
-                  }
-                }
-              }
-            }
-          }
-        }
-        // Fill in the submatrices to the full (6x6) matrix
-        Rotation_matrix_at_node[j_node](0, 0) = 1.0;
-        // Fill in b1 --- the affine contribution to rotation of the
-        // first derivatives
-        for (unsigned i = 0; i < 2; ++i)
-        {
-          for (unsigned j = 0; j < 2; ++j)
-          {
-            Rotation_matrix_at_node[j_node](1 + i, 1 + j) = b1(i, j);
-          }
-        }
-        // Fill in b21 --- the non-affine (second derivative dependent)
-        // rotation of the first derivatives
-        for (unsigned i = 0; i < 2; ++i)
-        {
-          for (unsigned j = 0; j < 3; ++j)
-          {
-            Rotation_matrix_at_node[j_node](1 + i, 3 + j) = b12(i, j);
-          }
-        }
-        // Fill in b22 --- the rotation of the second derivatives
-        for (unsigned i = 0; i < 3; ++i)
-        {
-          for (unsigned j = 0; j < 3; ++j)
-          {
-            Rotation_matrix_at_node[j_node](3 + i, 3 + j) = b22(i, j);
-          }
-        }
-      } // end fill_in_rotation_matrix_at_node_with_basis
-
-      /// Pointer to the `parent' finite element which this is a helper force
-      FiniteElement* Parent_element_pt;
-
-      /// Vector containing boundary parametrised location for each node
-      Vector<double> Boundary_coordinate_of_node;
-
-      /// Vector containing boundary parametrisation at each node
-      Vector<CurvilineGeomObject*> Nodal_boundary_parametrisation_pt;
-
-      /// Vector containing <rotation matrix at each node>
-      Vector<DenseMatrix<double>> Rotation_matrix_at_node;
-    };
-    //---end of rotation helper class-------------------------------------------
 
 
     /// Get the zeta coordinate
@@ -937,11 +718,21 @@ namespace oomph
 
 
   protected:
+    //----------------------------------------------------------------
+    // Basis and test retrieval functions
+
     /// In-plane basis functions and derivatives w.r.t. global
     /// coords at local coordinate s; return det(Jacobian of mapping)
-    virtual double dbasis_u_eulerian_foeppl_von_karman(const Vector<double>& s,
-                                                       Shape& psi_n,
-                                                       DShape& dpsi_n_dx) const;
+    virtual double basis_u_foeppl_von_karman(
+      const Vector<double>& s,
+      Shape& psi_n) const;
+
+    /// In-plane basis functions and derivatives w.r.t. global
+    /// coords at local coordinate s; return det(Jacobian of mapping)
+    virtual double dbasis_u_eulerian_foeppl_von_karman(
+      const Vector<double>& s,
+      Shape& psi_n,
+      DShape& dpsi_n_dx) const;
 
     /// In-plane basis/test functions at and derivatives w.r.t
     /// global coords at local coordinate s; return det(Jacobian of mapping)
@@ -952,12 +743,30 @@ namespace oomph
       Shape& test_n,
       DShape& dtest_n_dx) const;
 
+    /// Out-of-plane basis functions at local coordinate s
+    virtual void basis_w_foeppl_von_karman(
+      const Vector<double>& s,
+      Shape& psi_n,
+      Shape& psi_i) const;
+
+    /// Out-of-plane basis functions and derivs w.r.t. global
+    /// coords at local coordinate s; return det(Jacobian of mapping)
+    virtual double d2basis_w_eulerian_foeppl_von_karman(
+      const Vector<double>& s,
+      Shape& psi_n,
+      Shape& psi_i,
+      DShape& dpsi_n_dx,
+      DShape& dpsi_i_dx,
+      DShape& d2psi_n_dx2,
+      DShape& d2psi_i_dx2) const;
+
     /// Out-of-plane basis/test functions at local coordinate s
-    virtual void basis_and_test_w_foeppl_von_karman(const Vector<double>& s,
-                                                    Shape& psi_n,
-                                                    Shape& psi_i,
-                                                    Shape& test_n,
-                                                    Shape& test_i) const;
+    virtual void basis_and_test_w_foeppl_von_karman(
+      const Vector<double>& s,
+      Shape& psi_n,
+      Shape& psi_i,
+      Shape& test_n,
+      Shape& test_i) const;
 
     /// Out-of-plane basis/test functions and first derivs w.r.t.
     /// to global coords at local coordinate s; return det(Jacobian of mapping)
@@ -971,17 +780,6 @@ namespace oomph
       Shape& test_i,
       DShape& dtest_n_dx,
       DShape& dtest_i_dx) const;
-
-    /// Out-of-plane basis functions and derivs w.r.t. global
-    /// coords at local coordinate s; return det(Jacobian of mapping)
-    virtual double d2basis_w_eulerian_foeppl_von_karman(
-      const Vector<double>& s,
-      Shape& psi_n,
-      Shape& psi_i,
-      DShape& dpsi_n_dx,
-      DShape& dpsi_i_dx,
-      DShape& d2psi_n_dx2,
-      DShape& d2psi_i_dx2) const;
 
     /// Out-of-plane basis/test functions and first/second derivs
     /// w.r.t. to global coords at local coordinate s;
@@ -1171,11 +969,11 @@ namespace oomph
     // /// A Pointer to the function that sets up the rotated basis at point x
     // BasisVectorsFctPt Rotated_basis_fct_pt;
 
-    /// Which nodes are we rotating
-    Vector<unsigned> Nodes_to_rotate;
+  //   /// Which nodes are we rotating
+  //   Vector<unsigned> Nodes_to_rotate;
 
-    /// Number of nodes to rotate
-    unsigned Nnodes_to_rotate;
+  //   /// Number of nodes to rotate
+  //   unsigned Nnodes_to_rotate;
   };
 
 
@@ -1330,25 +1128,58 @@ namespace oomph
   // }
 
 
+
+  //============================================================================
+  /// In-plane basis functions and derivatives w.r.t. global
+  /// coords at local coordinate s; return det(Jacobian of mapping)
+  //============================================================================
+  template<unsigned NNODE_1D>
+  double FoepplVonKarmanC1CurvableBellElement<
+    NNODE_1D>::basis_u_foeppl_von_karman(const Vector<double>& s,
+					 Shape& psi_n) const
+  {
+    // Dimension
+    unsigned dim = this->dim();
+
+    // Initialise and get dpsi w.r.t local coord
+    const unsigned n_node = this->nnode();
+    DShape dummy_dpsids(n_node, dim);
+    dshape_u_local(s, psi_n, dummy_dpsids);
+    double J;
+
+    // Get the Jacobian of the mapping
+    DenseMatrix<double> jacobian(dim, dim);
+    DenseMatrix<double> inverse_jacobian(dim, dim);
+    J = CurvableBellElement<NNODE_1D>::local_to_eulerian_mapping(
+      s, jacobian, inverse_jacobian);
+
+    return J;
+  }
+
+
+
   //============================================================================
   /// Fetch the in-plane basis functions and their derivatives w.r.t. global
   /// coordinates at s and return Jacobian of mapping.
-  //=============================================================================
+  //============================================================================
   template<unsigned NNODE_1D>
   double FoepplVonKarmanC1CurvableBellElement<
     NNODE_1D>::dbasis_u_eulerian_foeppl_von_karman(const Vector<double>& s,
                                                    Shape& psi_n,
                                                    DShape& dpsi_n_dx) const
   {
+    // Dimension
+    unsigned dim = this->dim();
+
     // Initialise and get dpsi w.r.t local coord
     const unsigned n_node = this->nnode();
-    DShape dpsids(n_node, this->dim());
+    DShape dpsids(n_node, dim);
     dshape_u_local(s, psi_n, dpsids);
     double J;
 
     // Get the Jacobian of the mapping
-    DenseMatrix<double> jacobian(this->dim(), this->dim()),
-      inverse_jacobian(this->dim(), this->dim());
+    DenseMatrix<double> jacobian(dim, dim);
+    DenseMatrix<double> inverse_jacobian(dim, dim);
     J = CurvableBellElement<NNODE_1D>::local_to_eulerian_mapping(
       s, jacobian, inverse_jacobian);
 
@@ -1416,6 +1247,30 @@ namespace oomph
   }
 
 
+
+  //======================================================================
+  /// (pure virtual) Out-of-plane basis functions at local coordinate s
+  //======================================================================
+  template<unsigned NNODE_1D>
+  void FoepplVonKarmanC1CurvableBellElement<
+    NNODE_1D>::basis_w_foeppl_von_karman(const Vector<double>& s,
+                                                  Shape& psi_n,
+                                                  Shape& psi_i) const
+  {
+    throw OomphLibError("This still needs testing for curved elements.",
+                        "void FoepplVonKarmanC1CurvableBellElement<NNODE_1D>::\
+shape_and_test_foeppl_von_karman(...)",
+                        OOMPH_EXCEPTION_LOCATION);
+
+    this->c1_basis(s, psi_n, psi_i);
+
+    // Rotate the degrees of freedom
+    rotate_shape(psi_n);
+  }
+
+
+
+
   //======================================================================
   /// Define the shape functions and test functions and derivatives
   /// w.r.t. global coordinates and return Jacobian of mapping.
@@ -1430,11 +1285,7 @@ namespace oomph
                                                   Shape& test_n,
                                                   Shape& test_i) const
   {
-    throw OomphLibError("This still needs testing for curved elements.",
-                        "void FoepplVonKarmanC1CurvableBellElement<NNODE_1D>::\
-shape_and_test_foeppl_von_karman(...)",
-                        OOMPH_EXCEPTION_LOCATION);
-
+    // Use the c1 basis
     this->c1_basis(s, psi_n, psi_i);
 
     // Rotate the degrees of freedom
@@ -1465,12 +1316,6 @@ shape_and_test_foeppl_von_karman(...)",
 						DShape& dtest_n_dx,
 						DShape& dtest_i_dx) const
   {
-    // Throw if called
-    throw OomphLibError("This still needs testing for curved elements.",
-                        "void FoepplVonKarmanC1CurvableBellElement<NNODE_1D>::\
-dshape_and_dtest_foeppl_von_karman(...)",
-                        OOMPH_EXCEPTION_LOCATION); // HERE
-
     // Get the basis
     double J = this->d_c1_basis_eulerian(s, psi_n, psi_i, dpsi_n_dx, dpsi_i_dx);
 
@@ -1576,7 +1421,7 @@ dshape_and_dtest_foeppl_von_karman(...)",
       // If the node has had its boundary parametrisation set, its shape
       // functions need rotating
       if (Rotated_boundary_helper_pt
-	  ->get_nodal_boundary_parametrisation(j_node))
+	  ->nodal_boundary_parametrisation_pt(j_node))
       {
         nodes_to_rotate.push_back(j_node);
       }
@@ -1639,7 +1484,7 @@ dshape_and_dtest_foeppl_von_karman(...)",
       // If the node has had its boundary parametrisation set, its shape
       // functions need rotating
       if (Rotated_boundary_helper_pt
-	  ->get_nodal_boundary_parametrisation(j_node))
+	  ->nodal_boundary_parametrisation_pt(j_node))
       {
         nodes_to_rotate.push_back(j_node);
       }
@@ -1841,16 +1686,16 @@ dshape_and_dtest_foeppl_von_karman(...)",
     const unsigned first_nodal_type_index =
       this->first_nodal_type_index_for_field(w_index);
     const unsigned n_vertices = nw_node();
-    const unsigned n_type = nw_type_at_each_node();
 
     #ifdef PARANOID
     // Check that the dof number is a sensible value
+    unsigned n_type = nw_type_at_each_node();
     if (j_type >= n_type)
     {
       throw OomphLibError(
         "Foppl von Karman elements only have 6 Hermite deflection degrees\
 of freedom at internal points. They are {w ; w,x ; w,y ; w,xx ; w,xy ; w,yy}",
-        "FoepplVonKarmanC1CurvableBellElement:fix_out_of_plane_dof()",
+        OOMPH_CURRENT_FUNCTION,
         OOMPH_EXCEPTION_LOCATION);
     }
     #endif
@@ -1894,17 +1739,17 @@ of freedom at internal points. They are {w ; w,x ; w,y ; w,xx ; w,xy ; w,yy}",
     const unsigned nodal_type_index =
       this->first_nodal_type_index_for_field(field_index);
     const unsigned n_node = nu_node();
-    const unsigned n_type = 2 * nu_type_at_each_node();
     const unsigned dim = this->dim();
 
     #ifdef PARANOID
     // Check that the dof number is a sensible value
+    const unsigned n_type = 2*nu_type_at_each_node();
     if (alpha >= n_type)
     {
       throw OomphLibError(
         "Foppl von Karman elements only have 2 in-plane displacement degrees\
 of freedom at internal points. They are {ux, uy}",
-        "FoepplVonKarmanC1CurvableBellElement:fix_out_of_plane_dof()",
+        OOMPH_CURRENT_FUNCTION,
         OOMPH_EXCEPTION_LOCATION);
     }
     #endif
@@ -2478,95 +2323,96 @@ of freedom at internal points. They are {ux, uy}",
         }
       }
 
-      // [zdec] debug
-      std::ofstream jac_and_hess;
+      // // [zdec] debug
+      // std::ofstream jac_and_hess;
 
-      jac_and_hess.open("corner_jac_and_hess_new.csv", std::ios_base::app);
-      jac_and_hess << "Jacobian :" << std::endl
-                   << jac_of_transform(0, 0) << " " << jac_of_transform(0, 1) << std::endl
-                   << jac_of_transform(1, 0) << " " << jac_of_transform(1, 1) << std::endl
-                   << "Hessian [x]:" << std::endl
-                   << hess_of_transform[0](0, 0) << " " << hess_of_transform[0](0, 1)
-                   << std::endl
-                   << hess_of_transform[0](1, 0) << " " << hess_of_transform[0](1, 1)
-                   << std::endl
-                   << "Hessian [y]:" << std::endl
-                   << hess_of_transform[1](0, 0) << " " << hess_of_transform[1](0, 1)
-                   << std::endl
-                   << hess_of_transform[1](1, 0) << " " << hess_of_transform[1](1, 1)
-                   << std::endl
-                   << std::endl;
-      jac_and_hess.close();
-
-
-      jac_and_hess.open("invleft_jac_and_hess_new.csv", std::ios_base::app);
-      jac_and_hess << "Jacobian :" << std::endl
-                   << left_jac_inv(0, 0) << " " << left_jac_inv(0, 1) << std::endl
-                   << left_jac_inv(1, 0) << " " << left_jac_inv(1, 1) << std::endl
-                   << "Hessian [x]:" << std::endl
-                   << left_hess_inv[0](0, 0) << " " << left_hess_inv[0](0, 1)
-                   << std::endl
-                   << left_hess_inv[0](1, 0) << " " << left_hess_inv[0](1, 1)
-                   << std::endl
-                   << "Hessian [y]:" << std::endl
-                   << left_hess_inv[1](0, 0) << " " << left_hess_inv[1](0, 1)
-                   << std::endl
-                   << left_hess_inv[1](1, 0) << " " << left_hess_inv[1](1, 1)
-                   << std::endl
-                   << std::endl;
-      jac_and_hess.close();
-
-      jac_and_hess.open("left_jac_and_hess_new.csv", std::ios_base::app);
-      jac_and_hess << "Jacobian :" << std::endl
-                   << left_jac(0, 0) << " " << left_jac(0, 1) << std::endl
-                   << left_jac(1, 0) << " " << left_jac(1, 1) << std::endl
-                   << "Hessian [x]:" << std::endl
-                   << left_hess[0](0, 0) << " " << left_hess[0](0, 1)
-                   << std::endl
-                   << left_hess[0](1, 0) << " " << left_hess[0](1, 1)
-                   << std::endl
-                   << "Hessian [y]:" << std::endl
-                   << left_hess[1](0, 0) << " " << left_hess[1](0, 1)
-                   << std::endl
-                   << left_hess[1](1, 0) << " " << left_hess[1](1, 1)
-                   << std::endl
-                   << std::endl;
-      jac_and_hess.close();
-
-      jac_and_hess.open("right_jac_and_hess_new.csv", std::ios_base::app);
-      jac_and_hess << "Jacobian :" << std::endl
-                   << right_jac(0, 0) << " " << right_jac(0, 1) << std::endl
-                   << right_jac(1, 0) << " " << right_jac(1, 1) << std::endl
-                   << "Hessian [x]:" << std::endl
-                   << right_hess[0](0, 0) << " " << right_hess[0](0, 1)
-                   << std::endl
-                   << right_hess[0](1, 0) << " " << right_hess[0](1, 1)
-                   << std::endl
-                   << "Hessian [y]:" << std::endl
-                   << right_hess[1](0, 0) << " " << right_hess[1](0, 1)
-                   << std::endl
-                   << right_hess[1](1, 0) << " " << right_hess[1](1, 1)
-                   << std::endl
-                   << std::endl;
-      jac_and_hess.close();
+      // jac_and_hess.open("corner_jac_and_hess_new.csv", std::ios_base::app);
+      // jac_and_hess << "Jacobian :" << std::endl
+      //              << jac_of_transform(0, 0) << " " << jac_of_transform(0, 1) << std::endl
+      //              << jac_of_transform(1, 0) << " " << jac_of_transform(1, 1) << std::endl
+      //              << "Hessian [x]:" << std::endl
+      //              << hess_of_transform[0](0, 0) << " " << hess_of_transform[0](0, 1)
+      //              << std::endl
+      //              << hess_of_transform[0](1, 0) << " " << hess_of_transform[0](1, 1)
+      //              << std::endl
+      //              << "Hessian [y]:" << std::endl
+      //              << hess_of_transform[1](0, 0) << " " << hess_of_transform[1](0, 1)
+      //              << std::endl
+      //              << hess_of_transform[1](1, 0) << " " << hess_of_transform[1](1, 1)
+      //              << std::endl
+      //              << std::endl;
+      // jac_and_hess.close();
 
 
-      // [zdec] debug
-      std::ofstream debug_stream;
-      debug_stream.open("left_norm_and_tan.dat", std::ios_base::app);
-      debug_stream << left_x[0] << " " << left_x[1] << " " << left_ni[0] << " "
-                   << left_ni[1] << " " << left_ti[0] << " " << left_ti[1] << " "
-                   << left_dnids[0] << " " << left_dnids[1] << " " << left_dtids[0]
-                   << " " << left_dtids[1] << " " << left_d2xids2[0] << " "
-                   << left_d2xids2[1] << std::endl;
-      debug_stream.close();
-      debug_stream.open("right_norm_and_tan.dat", std::ios_base::app);
-      debug_stream << right_x[0] << " " << right_x[1] << " " << right_ni[0] << " "
-                   << right_ni[1] << " " << right_ti[0] << " " << right_ti[1] << " "
-                   << right_dnids[0] << " " << right_dnids[1] << " " << right_dtids[0]
-                   << " " << right_dtids[1] << " " << right_d2xids2[0] << " "
-                   << right_d2xids2[1] << std::endl;
-      debug_stream.close();
+      // jac_and_hess.open("invleft_jac_and_hess_new.csv", std::ios_base::app);
+      // jac_and_hess << "Jacobian :" << std::endl
+      //              << left_jac_inv(0, 0) << " " << left_jac_inv(0, 1) << std::endl
+      //              << left_jac_inv(1, 0) << " " << left_jac_inv(1, 1) << std::endl
+      //              << "Hessian [x]:" << std::endl
+      //              << left_hess_inv[0](0, 0) << " " << left_hess_inv[0](0, 1)
+      //              << std::endl
+      //              << left_hess_inv[0](1, 0) << " " << left_hess_inv[0](1, 1)
+      //              << std::endl
+      //              << "Hessian [y]:" << std::endl
+      //              << left_hess_inv[1](0, 0) << " " << left_hess_inv[1](0, 1)
+      //              << std::endl
+      //              << left_hess_inv[1](1, 0) << " " << left_hess_inv[1](1, 1)
+      //              << std::endl
+      //              << std::endl;
+      // jac_and_hess.close();
+
+      // jac_and_hess.open("left_jac_and_hess_new.csv", std::ios_base::app);
+      // jac_and_hess << "Jacobian :" << std::endl
+      //              << left_jac(0, 0) << " " << left_jac(0, 1) << std::endl
+      //              << left_jac(1, 0) << " " << left_jac(1, 1) << std::endl
+      //              << "Hessian [x]:" << std::endl
+      //              << left_hess[0](0, 0) << " " << left_hess[0](0, 1)
+      //              << std::endl
+      //              << left_hess[0](1, 0) << " " << left_hess[0](1, 1)
+      //              << std::endl
+      //              << "Hessian [y]:" << std::endl
+      //              << left_hess[1](0, 0) << " " << left_hess[1](0, 1)
+      //              << std::endl
+      //              << left_hess[1](1, 0) << " " << left_hess[1](1, 1)
+      //              << std::endl
+      //              << std::endl;
+      // jac_and_hess.close();
+
+      // jac_and_hess.open("right_jac_and_hess_new.csv", std::ios_base::app);
+      // jac_and_hess << "Jacobian :" << std::endl
+      //              << right_jac(0, 0) << " " << right_jac(0, 1) << std::endl
+      //              << right_jac(1, 0) << " " << right_jac(1, 1) << std::endl
+      //              << "Hessian [x]:" << std::endl
+      //              << right_hess[0](0, 0) << " " << right_hess[0](0, 1)
+      //              << std::endl
+      //              << right_hess[0](1, 0) << " " << right_hess[0](1, 1)
+      //              << std::endl
+      //              << "Hessian [y]:" << std::endl
+      //              << right_hess[1](0, 0) << " " << right_hess[1](0, 1)
+      //              << std::endl
+      //              << right_hess[1](1, 0) << " " << right_hess[1](1, 1)
+      //              << std::endl
+      //              << std::endl;
+      // jac_and_hess.close();
+
+
+      // // [zdec] debug
+      // std::ofstream debug_stream;
+      // debug_stream.open("left_norm_and_tan.dat", std::ios_base::app);
+      // debug_stream << left_x[0] << " " << left_x[1] << " " << left_ni[0] << " "
+      //              << left_ni[1] << " " << left_ti[0] << " " << left_ti[1] << " "
+      //              << left_dnids[0] << " " << left_dnids[1] << " " << left_dtids[0]
+      //              << " " << left_dtids[1] << " " << left_d2xids2[0] << " "
+      //              << left_d2xids2[1] << std::endl;
+      // debug_stream.close();
+      // debug_stream.open("right_norm_and_tan.dat", std::ios_base::app);
+      // debug_stream << right_x[0] << " " << right_x[1] << " " << right_ni[0] << " "
+      //              << right_ni[1] << " " << right_ti[0] << " " << right_ti[1] << " "
+      //              << right_dnids[0] << " " << right_dnids[1] << " " << right_dtids[0]
+      //              << " " << right_dtids[1] << " " << right_d2xids2[0] << " "
+      //              << right_d2xids2[1] << std::endl;
+      // debug_stream.close();
+
     } // End get_jac_and_hess_of_coordinate_transform
 
 
@@ -2984,8 +2830,8 @@ of freedom at internal points. They are {ux, uy}",
 		      // Add the contribution to the jacobian
 		      jacobian(left_eqn_number, lagrange_dof_number) +=
 			jac_term;
-		      // And by symmetry, we can add the transpose contribution to
-		      // the jacobian
+		      // And by symmetry, we can add the transpose contribution
+		      // to the jacobian
 		      jacobian(lagrange_dof_number, left_eqn_number) +=
 			jac_term;
 		    }
@@ -3038,6 +2884,11 @@ of freedom at internal points. They are {ux, uy}",
     /// precision and it shouldn't generally need to be touched)
     double Orthogonality_tolerance = 1.0e-15;
   };
+
+
+
+
+
 
 } // namespace oomph
 

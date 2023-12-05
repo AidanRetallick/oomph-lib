@@ -39,6 +39,9 @@
 #include "../generic/oomph_utilities.h"
 #include "../generic/Telements.h"
 
+// [zdec] TODO:
+// -- Move function definitions to .cc
+
 namespace oomph
 {
   //=============================================================================
@@ -70,12 +73,13 @@ namespace oomph
   public:
     /// A pointer to a scalar function of the position. Can be used for
     /// out-of-plane forcing, swelling, isotropic-prestrain, etc.
-    typedef void (*ScalarFctPt)(const Vector<double>& x, double& f);
+    typedef void (*ScalarFctPt)(const Vector<double>& x,
+				double& f);
 
     /// A pointer to a vector function of the position. Can be used for
     /// in-of-plane forcing, anisotropic-prestrain, etc.
     typedef void (*VectorFctPt)(const Vector<double>& x,
-                                Vector<double>& forcing);
+                                Vector<double>& f);
 
     /// Function pointer to the Error Metric we are using
     /// e.g could be that we are just interested in error on w etc.
@@ -94,7 +98,7 @@ namespace oomph
                                              Vector<double>& norm);
 
 
-    //----------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     // Pure virtual interfaces which must be implemented when geometry and bases
     // are added in the derived class
 
@@ -193,8 +197,16 @@ namespace oomph
   protected:
     /// (pure virtual) In-plane basis functions and derivatives w.r.t. global
     /// coords at local coordinate s; return det(Jacobian of mapping)
+    virtual double basis_u_foeppl_von_karman(
+      const Vector<double>& s,
+      Shape& psi_n) const = 0;
+
+    /// (pure virtual) In-plane basis functions and derivatives w.r.t. global
+    /// coords at local coordinate s; return det(Jacobian of mapping)
     virtual double dbasis_u_eulerian_foeppl_von_karman(
-      const Vector<double>& s, Shape& psi_n, DShape& dpsi_n_dx) const = 0;
+      const Vector<double>& s,
+      Shape& psi_n,
+      DShape& dpsi_n_dx) const = 0;
 
     /// (pure virtual) In-plane basis/test functions at and derivatives w.r.t
     /// global coords at local coordinate s; return det(Jacobian of mapping)
@@ -205,12 +217,30 @@ namespace oomph
       Shape& test_n,
       DShape& dtest_n_dx) const = 0;
 
+    /// (pure virtual) Out-of-plane basis functions at local coordinate s
+    virtual void basis_w_foeppl_von_karman(
+      const Vector<double>& s,
+      Shape& psi_n,
+      Shape& psi_i) const = 0;
+
+    /// (pure virtual) Out-of-plane basis functions and derivs w.r.t. global
+    /// coords at local coordinate s; return det(Jacobian of mapping)
+    virtual double d2basis_w_eulerian_foeppl_von_karman(
+      const Vector<double>& s,
+      Shape& psi_n,
+      Shape& psi_i,
+      DShape& dpsi_n_dx,
+      DShape& dpsi_i_dx,
+      DShape& d2psi_n_dx2,
+      DShape& d2psi_i_dx2) const = 0;
+
     /// (pure virtual) Out-of-plane basis/test functions at local coordinate s
-    virtual void basis_and_test_w_foeppl_von_karman(const Vector<double>& s,
-                                                    Shape& psi_n,
-                                                    Shape& psi_i,
-                                                    Shape& test_n,
-                                                    Shape& test_i) const = 0;
+    virtual void basis_and_test_w_foeppl_von_karman(
+      const Vector<double>& s,
+      Shape& psi_n,
+      Shape& psi_i,
+      Shape& test_n,
+      Shape& test_i) const = 0;
 
     /// (pure virtual) Out-of-plane basis/test functions and first derivs w.r.t.
     /// to global coords at local coordinate s; return det(Jacobian of mapping)
@@ -224,17 +254,6 @@ namespace oomph
       Shape& test_i,
       DShape& dtest_n_dx,
       DShape& dtest_i_dx) const = 0;
-
-    /// (pure virtual) Out-of-plane basis functions and derivs w.r.t. global
-    /// coords at local coordinate s; return det(Jacobian of mapping)
-    virtual double d2basis_w_eulerian_foeppl_von_karman(
-      const Vector<double>& s,
-      Shape& psi_n,
-      Shape& psi_i,
-      DShape& dpsi_n_dx,
-      DShape& dpsi_i_dx,
-      DShape& d2psi_n_dx2,
-      DShape& d2psi_i_dx2) const = 0;
 
     /// (pure virtual) Out-of-plane basis/test functions and first/second derivs
     /// w.r.t. to global coords at local coordinate s;
@@ -267,6 +286,7 @@ namespace oomph
       : Pressure_fct_pt(0),
         In_plane_forcing_fct_pt(0),
         Swelling_fct_pt(0),
+	Solve_u_exact(false),
         Error_metric_fct_pt(0),
         Multiple_error_metric_fct_pt(0),
         U_is_damped(false),
@@ -324,13 +344,12 @@ namespace oomph
     }
 
     /// Output FE representation of soln: x,y,u or x,y,z,u at
-    /// n_plot^DIM plot points
-    /// [zdec] isnt this n_plot*(n_plot+1)/2?
+    /// n_plot*(n_plot+1)/2 plot points
     void output(std::ostream& outfile, const unsigned& n_plot);
 
     /// Full output function with a rich set of unknowns:
-    ///  x, y, ux, uy, w, dw, ddw, du, strain, stress, principal stress
-    /// at n_plot^DIM plot points
+    ///  x, y, ux, uy, w, du, dw, d2w, strain, stress, principal stress
+    /// at n_plot*(n_plot+1)/2 plot points
     void full_output(std::ostream& outfile, const unsigned& n_plot);
 
     /// C_style output with default number of plot points
@@ -340,19 +359,17 @@ namespace oomph
       FoepplVonKarmanEquations::output(file_pt, n_plot);
     }
 
-    /// \short C-style output FE representation of soln: x,y,u or x,y,z,u at
-    /// n_plot^DIM plot points
+    /// C-style output FE representation of soln: x,y,u or x,y,z,u at
+    /// n_plot*(n_plot+1)/2 plot points
     void output(FILE* file_pt, const unsigned& n_plot);
 
-    /// Output exact soln: x,y,u_exact or x,y,z,u_exact at n_plot^DIM plot
-    /// points
+    /// Output exact soln: x,y,u_exact at n_plot*(n_plot_1)/2 plot points
     void output_fct(std::ostream& outfile,
                     const unsigned& n_plot,
                     FiniteElement::SteadyExactSolutionFctPt exact_soln_pt);
 
-    /// \short Output exact soln: x,y,u_exact or x,y,z,u_exact at
-    /// n_plot^DIM plot points (dummy time-dependent version to
-    /// keep intel compiler happy)
+    /// Output exact soln: x,y,u_exact or x,y,z,u_exact at n_plot^DIM plot
+    /// points (dummy time-dependent version to keep intel compiler happy)
     virtual void output_fct(
       std::ostream& outfile,
       const unsigned& n_plot,
@@ -590,6 +607,63 @@ namespace oomph
       return Multiple_error_metric_fct_pt;
     }
 
+    /// Access function: Bool that swaps element residuals to solve
+    ///  (ux,uy,w) = (ux_ex,uy_ex,w_ex)
+    /// which is useful for applying initial guesses or for debugging
+    bool get_solve_u_exact() const
+    {
+      return Solve_u_exact;
+    }
+
+    /// Access function: Get pointer to u_exact function
+    void get_u_exact_pt(VectorFctPt& u_exact_pt)
+    {
+      u_exact_pt = U_exact_pt;
+    }
+
+    /// Function to get the u_exact displacement field at global coordinates x
+    void get_u_exact(const Vector<double>& x, Vector<double>& u_exact)
+    {
+      // Get the exact function pointer
+      VectorFctPt u_exact_function_pt = 0;
+      get_u_exact_pt(u_exact_function_pt);
+
+      // Call the exact function at x and assign it to u
+      (*u_exact_function_pt)(x,u_exact);
+    }
+
+    /// Activate the alternative residuals which are used to solve for an exact
+    /// displacement field assignment (doesn't set exact function pointer)
+    void activate_u_exact_solve()
+    {
+      // Throw an error if we haven't set a function pointer for u_exact yet
+      if(!U_exact_pt)
+      {
+	throw OomphLibError("You need to set U_exact_pt before activating\
+ Solve_u_exact",
+			    OOMPH_EXCEPTION_LOCATION,
+			    OOMPH_CURRENT_FUNCTION);
+      }
+      // Set the alternative equations flag to be true
+      Solve_u_exact = true;
+    }
+
+    /// Activate the alternative residuals and set the exact function pointer
+    void activate_u_exact_solve(VectorFctPt u_exact_pt)
+    {
+      // Update the exact displacement function pointer
+      U_exact_pt = u_exact_pt;
+      // Call the basic function which does the rest of the work
+      activate_u_exact_solve();
+    }
+
+    /// Deactivate the alternative residuals
+    void deactivate_u_exact_solve()
+    {
+      // Set the alternative equations flag to be false
+      Solve_u_exact = false;
+    }
+
     /// Access value of the damping flag for u
     virtual bool u_is_damped() const
     {
@@ -670,6 +744,7 @@ namespace oomph
       }
     }
 
+
     /// Get swelling at (Eulerian) position x. This function is
     /// virtual to allow overloading. [zdec] add ipt
     inline virtual void get_swelling_foeppl_von_karman(const Vector<double>& x,
@@ -686,11 +761,6 @@ namespace oomph
         (*Swelling_fct_pt)(x, swelling);
       }
     }
-
-
-    // /// Calculate the elastic energy of the element and return it as a
-    // /// double. [zdec] Check this and change it to assign at reference
-    // virtual Vector<double> element_elastic_and_kinetic_energy();
 
 
     /// Add the element's contribution to its residual vector (wrapper)
@@ -736,19 +806,190 @@ namespace oomph
     }
 
 
-    // [zdec] just copied from
-    // fill_in_generic_residual_contribution_foeppl_von_karman
-    // can probably be done better
-    /// Return FE representation of unknown values u(s)
-    /// at local coordinate s
-    virtual inline Vector<double> interpolated_u_foeppl_von_karman(
+    /// Return FE representation of the three displacements at local coordinate
+    /// s
+    ///   0: u_x
+    ///   1: u_y
+    ///   2: w
+    virtual inline Vector<double> interpolated_fvk_disp(
       const Vector<double>& s) const
     {
       // The indices of in-plane and out-of-plane unknowns
       const unsigned n_u_fields = 2;
       const unsigned n_w_fields = 1;
 
-      // Find the dimension of the element [zdec] will this ever not be 2?
+      // Find the dimension of the element
+      const unsigned dim = this->dim();
+
+      // Find out how many nodes there are for each field
+      const unsigned n_u_node = nu_node();
+      const unsigned n_w_node = nw_node();
+
+      // Get the vector of nodes used for each field
+      const Vector<unsigned> u_nodes = get_u_node_indices();
+      const Vector<unsigned> w_nodes = get_w_node_indices();
+
+      // Find out how many basis types there are at each node
+      const unsigned n_u_nodal_type = nu_type_at_each_node();
+      const unsigned n_w_nodal_type = nw_type_at_each_node();
+
+      // Find out how many basis types there are internally
+      // NOTE: In general, the in-plane basis may require internal basis/test
+      // functions however, no such basis has been used so far and so this is
+      // not implemented. Comments marked with "[IN-PLANE-INTERNAL]" indicate
+      // locations where changes must be made in the case that internal data is
+      // used for the in-plane unknowns.
+      const unsigned n_u_internal_type = nu_type_internal();
+      const unsigned n_w_internal_type = nw_type_internal();
+
+#ifdef PARANOID
+      // [IN-PLANE-INTERNAL]
+      // This PARANOID block should be deleted if/when internal in-plane
+      // contributions have been implemented
+
+      // Throw an error if the number of internal in-plane basis types is
+      // non-zero
+      if (n_u_internal_type != 0)
+      {
+        throw OomphLibError(
+          "The number of internal basis types for u is non-zero\
+ but this functionality is not yet implemented. If you want to implement this\
+ look for comments containing the tag [IN-PLANE-INTERNAL].",
+          OOMPH_CURRENT_FUNCTION,
+          OOMPH_EXCEPTION_LOCATION);
+      }
+#endif
+
+      // In-plane local basis & test functions
+      // ------------------------------------------
+      // Local in-plane nodal basis and test functions
+      Shape psi_n_u(n_u_node, n_u_nodal_type);
+      // [IN-PLANE-INTERNAL]
+      // // Local in-plane internal basis and test functions
+      // Shape psi_i_u(n_u_internal_type);
+
+      // Out-of-plane local basis & test functions
+      // ------------------------------------------
+      // Nodal basis & test functions
+      Shape psi_n_w(n_w_node, n_w_nodal_type);
+      Shape test_n_w(n_w_node, n_w_nodal_type);
+      // Internal basis & test functions
+      Shape psi_i_w(n_w_internal_type);
+      Shape test_i_w(n_w_internal_type);
+
+      // Allocate and find global x
+      Vector<double> interp_x(dim, 0.0);
+      interpolated_x(s, interp_x);
+
+      // Call the derivatives of the shape and test functions for the out of
+      // plane unknown
+      basis_w_foeppl_von_karman(s, psi_n_w, psi_i_w);
+
+      // [IN-PLANE-INTERNAL]
+      // This does not include internal basis functions for u. If they are
+      // needed they must be added (as above for w)
+      basis_u_foeppl_von_karman(s, psi_n_u);
+
+
+      //======================= INTERPOLATION =================================
+
+      // Create space for in-plane interpolated unknowns
+      Vector<double> interpolated_u(n_u_fields, 0.0);
+      // Create space for out-of-plane interpolated unknowns
+      Vector<double> interpolated_w(n_w_fields, 0.0);
+
+      //---Nodal contribution to the in-plane unknowns--------------------------
+      // Loop over nodes used by in-plane fields
+      for (unsigned j_node = 0; j_node < n_u_node; j_node++)
+      {
+        // Get the j-th node used by in-plane fields
+        unsigned j_node_local = u_nodes[j_node];
+
+        // Loop over types
+        for (unsigned k_type = 0; k_type < n_u_nodal_type; k_type++)
+        {
+          // Loop over in-plane unknowns
+          for (unsigned alpha = 0; alpha < n_u_fields; alpha++)
+          {
+            // Get the nodal value of type k
+            double u_value =
+              get_u_alpha_value_at_node_of_type(alpha, j_node_local, k_type);
+
+            // --- Displacement ---
+            // Add nodal contribution of type k to the interpolated displacement
+            interpolated_u[alpha] += u_value * psi_n_u(j_node, k_type);
+
+          } // End of loop over the index of u -- alpha
+        } // End of loop over the types -- k_type
+      } // End of loop over the nodes -- j_node
+
+
+      //---Internal contribution to the in-plane
+      // unknowns-------------------------
+      // [IN-PLANE-INTERNAL]
+      // Internal contributions to in-plane interpolation not written
+
+
+      //---Nodal contribution to the out-of-plane
+      // unknowns------------------------
+      for (unsigned j_node = 0; j_node < n_w_node; j_node++)
+      {
+        // Get the j-th node used by in-plane fields
+        unsigned j_node_local = w_nodes[j_node];
+
+        // Loop over types
+        for (unsigned k_type = 0; k_type < n_w_nodal_type; k_type++)
+        {
+          // Get the nodal value of type k
+          double w_value = get_w_value_at_node_of_type(j_node_local, k_type);
+
+          // --- Displacement ---
+          // Add nodal contribution of type k to the interpolated displacement
+          interpolated_w[0] += w_value * psi_n_w(j_node, k_type);
+
+        } // End of loop over the types -- k_type
+      } // End of loop over the nodes -- j_node
+
+      //---Internal contribution to the out-of-plane field----------------------
+      // Loop over the internal data types
+      for (unsigned k_type = 0; k_type < n_w_internal_type; k_type++)
+      {
+        // Get the nodal value of type k
+        double w_value = get_w_internal_value_of_type(k_type);
+
+        // --- Displacement ---
+        // Add nodal contribution of type k to the interpolated displacement
+        interpolated_w[0] += w_value * psi_i_w(k_type);
+
+      } // End of loop over internal types -- k_type
+
+      //====================== END OF INTERPOLATION ============================
+
+      // Copy our interpolated fields into the order we want and return them.
+      Vector<double> interpolated_vals(12, 0.0);
+      interpolated_vals[0] = interpolated_u[0]; // ux
+      interpolated_vals[1] = interpolated_u[1]; // uy
+      interpolated_vals[2] = interpolated_w[0]; // w
+      return (interpolated_vals);
+    } // end of interpolated_fvk_disp
+
+
+    /// Return FE representation of the three displacements and their
+    /// derivatives at local coordinate s:
+    ///   0: u_x          6: du_y/dy
+    ///   1: u_y          7: dw/dx
+    ///   2: w            8: dw/dy
+    ///   3: du_x/dx      9: d2w/dx2
+    ///   4: du_x/dy     10: d2w/dxdy
+    ///   5: du_y/dx     11: d2w/dy2
+    virtual inline Vector<double> interpolated_fvk_disp_and_deriv(
+      const Vector<double>& s) const
+    {
+      // The indices of in-plane and out-of-plane unknowns
+      const unsigned n_u_fields = 2;
+      const unsigned n_w_fields = 1;
+
+      // Find the dimension of the element
       const unsigned dim = this->dim();
       // The number of first derivatives is the dimension of the element
       const unsigned n_deriv = dim;
@@ -848,10 +1089,9 @@ namespace oomph
       dbasis_u_eulerian_foeppl_von_karman(s, psi_n_u, dpsi_n_udxi);
 
 
-      //===========================
-      // INTERPOLATION================================= Create space for
-      // in-plane
-      // interpolated unknowns
+      //======================= INTERPOLATION =================================
+
+      // Create space for in-plane interpolated unknowns
       Vector<double> interpolated_u(n_u_fields, 0.0);
       Vector<double> interpolated_dudt(n_u_fields, 0.0);
       DenseMatrix<double> interpolated_dudxi(n_u_fields, n_deriv, 0.0);
@@ -861,8 +1101,7 @@ namespace oomph
       DenseMatrix<double> interpolated_dwdxi(n_w_fields, n_deriv, 0.0);
       DenseMatrix<double> interpolated_d2wdxi2(n_w_fields, n_2deriv, 0.0);
 
-      //---Nodal contribution to the in-plane
-      // unknowns----------------------------
+      //---Nodal contribution to the in-plane unknowns--------------------------
       // Loop over nodes used by in-plane fields
       for (unsigned j_node = 0; j_node < n_u_node; j_node++)
       {
@@ -992,8 +1231,7 @@ namespace oomph
         } // End of loop over the types -- k_type
       } // End of loop over the nodes -- j_node
 
-      //---Internal contribution to the out-of-plane
-      // field------------------------
+      //---Internal contribution to the out-of-plane field----------------------
       // --- Set up damping ---
       // By default, we have no history values (no damping)
       unsigned n_time = 0;
@@ -1047,29 +1285,29 @@ namespace oomph
 
       } // End of loop over internal types -- k_type
 
-      //====================== END OF INTERPOLATION
-      //==============================
+      //====================== END OF INTERPOLATION ============================
 
       // Copy our interpolated fields into f in the order we want and return it.
-      Vector<double> interpolated_f(12, 0.0);
-      interpolated_f[0] = interpolated_w[0]; // w
-      interpolated_f[1] = interpolated_dwdxi(0, 0); // dwdx
-      interpolated_f[2] = interpolated_dwdxi(0, 1); // dwdy
-      interpolated_f[3] = interpolated_d2wdxi2(0, 0); // d2wdx2
-      interpolated_f[4] = interpolated_d2wdxi2(0, 1); // d2wdxdy
-      interpolated_f[5] = interpolated_d2wdxi2(0, 2); // d2wdy2
-      interpolated_f[6] = interpolated_u[0]; // ux
-      interpolated_f[7] = interpolated_u[1]; // uy
-      interpolated_f[8] = interpolated_dudxi(0, 0); // duxdx
-      interpolated_f[9] = interpolated_dudxi(0, 1); // duxdy
-      interpolated_f[10] = interpolated_dudxi(1, 0); // duydx
-      interpolated_f[11] = interpolated_dudxi(1, 1); // duydy
-      return (interpolated_f);
+      Vector<double> interpolated_vals(12, 0.0);
+      interpolated_vals[0] = interpolated_u[0]; // ux
+      interpolated_vals[1] = interpolated_u[1]; // uy
+      interpolated_vals[2] = interpolated_w[0]; // w
+      interpolated_vals[3] = interpolated_dudxi(0, 0); // duxdx
+      interpolated_vals[4] = interpolated_dudxi(0, 1); // duxdy
+      interpolated_vals[5] = interpolated_dudxi(1, 0); // duydx
+      interpolated_vals[6] = interpolated_dudxi(1, 1); // duydy
+      interpolated_vals[7] = interpolated_dwdxi(0, 0); // dwdx
+      interpolated_vals[8] = interpolated_dwdxi(0, 1); // dwdy
+      interpolated_vals[9] = interpolated_d2wdxi2(0, 0); // d2wdx2
+      interpolated_vals[10] = interpolated_d2wdxi2(0, 1); // d2wdxdy
+      interpolated_vals[11] = interpolated_d2wdxi2(0, 2); // d2wdy2
+      return (interpolated_vals);
     }
     // END OF INTERPOLATED U FVK [zdec]
 
     /// Self-test: Return 0 for OK
     unsigned self_test();
+
 
   protected:
     /// Compute element residual Vector only (if flag=and/or element
@@ -1078,6 +1316,10 @@ namespace oomph
       Vector<double>& residuals,
       DenseMatrix<double>& jacobian,
       const unsigned& flag);
+
+    /// Add the element's contribution to its residual vector for the
+    /// alternative problem of (ux,uy,w) = (ux_exact,uy_exact,w_exact)
+    void fill_in_contribution_to_residual_u_exact(Vector<double> &residuals);
 
     /// Pointer to pressure function:
     ScalarFctPt Pressure_fct_pt;
@@ -1107,6 +1349,12 @@ namespace oomph
     /// Default eta value so that we use 'natural' nondim and have no h
     /// dependence.
     static const double Default_Eta_Value;
+
+    /// Flag to swap to alternative solve
+    bool Solve_u_exact;
+
+    /// Pointer to exact displacement field function pointer
+    VectorFctPt U_exact_pt;
 
     /// Pointer to error metric
     ErrorMetricFctPt Error_metric_fct_pt;

@@ -352,6 +352,7 @@ namespace oomph
       return First_nodal_type_index_for_field[i_field];
     }
 
+
     /// Return the nodal value for field i at node j of type k
     virtual double nodal_value_for_field_of_type(const unsigned& i_field,
                                                  const unsigned& j_node,
@@ -443,7 +444,7 @@ namespace oomph
       return x[i];
     }
 
-    /// Overloaded shape. Thin wrapper which breaks shape for upgraded elements,
+    /// Override shape. Thin wrapper which breaks shape for upgraded elements,
     /// which have a mapping but no shape function defined.
     virtual void shape(const Vector<double>& s, Shape& shape) const
     {
@@ -462,7 +463,7 @@ to access interpolated eulerian coordinate",
       }
     }
 
-    /// Overloaded shape. Thin wrapper which breaks shape for upgraded elements,
+    /// Override dshape. Thin wrapper which breaks shape for upgraded elements,
     /// which have a mapping but no shape function defined.
     virtual void dshape_local(const Vector<double>& s,
                               Shape& shape,
@@ -767,7 +768,9 @@ Elements.",
           // [zdec] debug
           oomph_info << "Upgrading to a 5-er" << std::endl;
           add_new_curved_basis<BernadouElementBasis<5>>();
-          new_integral_pt = new TGauss<2, 16>;
+	  // [zdec] INTEGRATION SCHEME HAS EXTERNAL KNOTS
+          //new_integral_pt = new TGauss<2, 16>;
+          new_integral_pt = new TGauss<2, 13>;
           break;
         default:
           throw OomphLibError("Currently only BernadouElementBasis<3> and "

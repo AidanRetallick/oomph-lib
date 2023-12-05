@@ -113,39 +113,32 @@ namespace oomph
   {
   public:
     /// Constructor: Unit line between origin and (1 , 0)
-    CurvilineLine()
-      : CurvilineGeomObject(),
-	X0 {0.0, 0.0},
-	X1 {1.0, 0.0}
-    {}
+    CurvilineLine() : CurvilineGeomObject(), X0{0.0, 0.0}, X1{1.0, 0.0} {}
 
     /// Constructor: Unit radius from origin at angle theta. The reverse flag
     /// flips the parametrisation direction. Useful for when only the slope
     /// matters.
-    CurvilineLine(const double& theta,
-		 const bool& reverse=false)
-      : CurvilineGeomObject(),
-	X0 {0.0, 0.0},
-	X1 {cos(theta), sin(theta)}
-    {
-      // Flip the parametrisation if requested
-      if(reverse)
+    CurvilineLine(const double& theta, const bool& reverse = false)
+      : CurvilineGeomObject(), X0{0.0, 0.0}, X1{cos(theta), sin(theta)}
+    { // Flip the parametrisation if requested
+      if (reverse)
       {
-	Vector<double> temp = X1;
-	X1[0]=X0[0];
-	X1[1]=X0[1];
-	X0[0]=temp[0];
-	X0[1]=temp[1];
+        Vector<double> temp = X1;
+        X1[0] = X0[0];
+        X1[1] = X0[1];
+        X0[0] = temp[0];
+        X0[1] = temp[1];
       }
     }
 
     /// Constructor: Straight line between x0 and x1
-    CurvilineLine(const Vector<double>& x0,
-		  const Vector<double>& x1)
+    CurvilineLine(const Vector<double>& x0, const Vector<double>& x1)
       : CurvilineGeomObject(),
-	X0(x0) ,
+	X0(x0),
 	X1(x1)
-    {}
+    {
+      // Do nothing
+    }
 
     /// Broken copy constructor
     CurvilineLine(const CurvilineLine& dummy)
@@ -162,12 +155,19 @@ namespace oomph
     /// (Empty) destructor
     virtual ~CurvilineLine() {}
 
+    /// Access function to set the start of the line
+    void set_ends(const Vector<double> &x0, const Vector<double> &x1)
+    {
+      X0 = x0;
+      X1 = x1;
+    }
+
     /// Position Vector w.r.t. to zeta:
     virtual void position(const Vector<double>& zeta,
 			  Vector<double>& r) const
     {
-      r[0] = (1.0-zeta[0]) * X0[0] + zeta[0] * X1[0];
-      r[1] = (1.0-zeta[0]) * X0[1] + zeta[0] * X1[1];
+      r[0] = (1.0 - zeta[0]) * X0[0] + zeta[0] * X1[0];
+      r[1] = (1.0 - zeta[0]) * X0[1] + zeta[0] * X1[1];
     }
 
     /// Derivative of position Vector w.r.t. to zeta:
@@ -175,7 +175,7 @@ namespace oomph
                            Vector<double>& drdzeta) const
     {
       drdzeta[0] = X1[0] - X0[0];
-      drdzeta[1] = X1[1] - X0[0];
+      drdzeta[1] = X1[1] - X0[1];
     }
 
 
@@ -195,10 +195,8 @@ namespace oomph
     double get_zeta(const Vector<double>& x) const
     {
       // The parametric parameter
-      return ( X1[0]-X0[0]!=0 ?
-	       (x[0]-X0[0])/(X1[0]-X0[0]) :
-	       (x[1]-X0[1])/(X1[1]-X0[1])
-	     );
+      return (X1[0] - X0[0] != 0 ? (x[0] - X0[0]) / (X1[0] - X0[0]) :
+                                   (x[1] - X0[1]) / (X1[1] - X0[1]));
     }
 
   private:
