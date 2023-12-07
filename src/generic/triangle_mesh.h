@@ -92,16 +92,16 @@ namespace oomph
     }
 
     // [zdec] work in progress
-    /// Divide an element into three by creating edges from the barycentre to
+    /// Divide an element into three by creating edges from the centroid to
     /// each of the vertex nodes
     template<class ELEMENT>
-    void split_element_through_barycentre(TimeStepper* const& time_stepper_pt,
+    void split_element_through_centroid(TimeStepper* const& time_stepper_pt,
                                           FiniteElement* const& el_pt,
                                           Vector<FiniteElement*>& new_el_pt,
 					  Vector<Node*>& new_nod_pt);
 
     /// Make sure no elements have two boundary edges by splitting them through
-    /// their barycentre (e.g. no corner elements straddling both boundaries)
+    /// their centroid (e.g. no corner elements straddling both boundaries)
     template<class ELEMENT>
     void split_elements_with_multiple_boundary_edges(
       TimeStepper* const& time_stepper_pt);
@@ -284,11 +284,11 @@ namespace oomph
 
 
   //==========================================================================
-  /// Divide an element into three by creating edges from the barycentre to
+  /// Divide an element into three by creating edges from the centroid to
   /// each of the vertex nodes
   //==========================================================================
   template<class ELEMENT>
-  void TriangleMeshBase::split_element_through_barycentre(
+  void TriangleMeshBase::split_element_through_centroid(
     TimeStepper* const& time_stepper_pt,
     FiniteElement* const& el_pt,
     Vector<FiniteElement*>& new_el_pt,
@@ -308,7 +308,7 @@ namespace oomph
     {
       case 2:
       {
-        // In this case, we need to add one new node c at the barycentre of the
+        // In this case, we need to add one new node c at the centroid of the
         // original element. This becomes node i of the ith element.
         //
         //  o2                          o2              //
@@ -716,7 +716,7 @@ namespace oomph
 
   //==========================================================================
   /// Make sure no elements have two boundary edges by splitting them through
-  /// their barycentre (e.g. corner elements straddling both boundaries)
+  /// their centroid (e.g. corner elements straddling both boundaries)
   //==========================================================================
   template<class ELEMENT>
   void TriangleMeshBase::split_elements_with_multiple_boundary_edges(
@@ -856,7 +856,7 @@ namespace oomph
 	Vector<Node*> new_nod_pt;
 
         // Split the element
-        split_element_through_barycentre<ELEMENT>(
+        split_element_through_centroid<ELEMENT>(
           time_stepper_pt,
 	  el_pt,
 	  new_el_pt,

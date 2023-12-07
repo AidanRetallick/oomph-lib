@@ -162,7 +162,7 @@ namespace oomph
       Vector<double> get_outer_normal(const Vector<double>& v0,
                                       const Vector<double>& v1) const;
 
-      /// \short Basis for a Bell  element. This follows exactly the notation of
+      /// Basis for a Bell element. This follows exactly the notation of
       /// M. Okabe in Comput. Methods Appl. Mech. 117 (1994) 411-421
       void d2_basis(const Vector<double>& s,
                     const Vector<Vector<double>>& v,
@@ -170,8 +170,8 @@ namespace oomph
                     DShape& dpsi,
                     DShape& d2psi) const;
 
-      /// \short Explicit basis for a Bell element. This follows exactly the
-      /// notation of M. Okabe in Comput. Methods Appl. Mech. 117 (1994) 411-421
+      /// Explicit basis for a Bell element. This follows exactly the notation
+      /// of M. Okabe in Comput. Methods Appl. Mech. 117 (1994) 411-421
       double d2_basis_eulerian(const Vector<double>& s,
                                const Vector<Vector<double>>& v,
                                Shape& psi,

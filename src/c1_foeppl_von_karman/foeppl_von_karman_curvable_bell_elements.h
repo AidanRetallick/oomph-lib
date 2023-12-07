@@ -1561,7 +1561,7 @@ shape_and_test_foeppl_von_karman(...)",
       // If the node has had its boundary parametrisation set, its shape
       // functions need rotating
       if (Rotated_boundary_helper_pt
-	  ->get_nodal_boundary_parametrisation(j_node))
+	  ->nodal_boundary_parametrisation_pt(j_node))
       {
         nodes_to_rotate.push_back(j_node);
       }

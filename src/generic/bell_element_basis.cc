@@ -56,8 +56,7 @@ namespace oomph
     }
 
     /// Basis on a reference element. This follows exactly the notation of M.
-    /// Okabe
-    ///  in Comput. Methods Appl. Mech. 117 (1994) 411-421
+    /// Okabe in Comput. Methods Appl. Mech. 117 (1994) 411-421
     void BellElementBasis::d2_basis(const Vector<double>& s,
                                     const Vector<Vector<double>>& v,
                                     Shape& psi,

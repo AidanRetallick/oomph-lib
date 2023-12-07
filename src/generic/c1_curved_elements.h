@@ -1038,6 +1038,7 @@ namespace oomph
                       DShape& dpsi,
                       DShape& dbpsi) const; // PRIVATE
 
+      // [zdec] What was David's plan here? Check with Matthias
       // HERE WRITE A PUBLIC dshape_local
 
       ///  Get the local second derivatives of the basis functions

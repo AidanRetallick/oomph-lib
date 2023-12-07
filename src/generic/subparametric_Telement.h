@@ -204,15 +204,16 @@ namespace oomph
   }; // End of Subparametric TElement class
 
 
-  //=============================================================================
+  //===========================================================================
   /// Curvable Bell element. It inherits simplax shape subparametricity
-  /// SubparametricTriangleElement for efficient position interpolation.
-  /// It also inherits the NNODE_1D Lagrangian basis.
-  /// By default this element is the standard simplex triangle Bell element with
-  /// 6dofs per node. The element can be upgraded to curved "triangle" elements
-  /// which provide accurate representation of boundary conditions by adding
-  /// additional Bernadou basis unknowns to the interior.
-  //=============================================================================
+  /// SubparametricTriangleElement for efficient position interpolation. It also
+  /// inherits the NNODE_1D Lagrangian basis. By default this element is the
+  /// standard simplex triangle Bell element with either NNODE_1D Lagrange or
+  /// Bell Hermite interpolation depending on the arguments passed to the
+  /// constructor. The element can be upgraded to curved "triangle" elements
+  /// which provide accurate representation of boundary conditions by upgrading
+  /// the Bell bases to the curved Bell/Bernadou basis.
+  //============================================================================
   template<unsigned NNODE_1D>
   class CurvableBellElement : public SubparametricTriangleElement<NNODE_1D>
   {
