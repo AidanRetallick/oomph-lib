@@ -216,3 +216,6 @@ distclean-local:
 	rm -rf mumps
 	rm -rf scalapack
 	rm -rf mumps_and_scalapack_default_installation
+
+junk:
+	echo $(FFLAGS)
