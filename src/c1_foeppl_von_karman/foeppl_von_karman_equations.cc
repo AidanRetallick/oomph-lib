@@ -393,165 +393,169 @@ namespace oomph
       //    w = w_exact
       // We run this if block and then break so that we skip over the remaining
       // (normal) FvK equations residuals
-      if(solve_u_exact)
+      if (solve_u_exact)
       {
-	// Get the exact displacement field we are trying to assign:
-	//   u_exact = (ux_exact,uy_exact,w_exact)
-	Vector<double> u_exact(3,0.0);
-	get_u_exact(interp_x,u_exact);
+        // Get the exact displacement field we are trying to assign:
+        //   u_exact = (ux_exact,uy_exact,w_exact)
+        Vector<double> u_exact(3, 0.0);
+        get_u_exact(interp_x, u_exact);
 
-	//--- In-plane equations --------
-	// Loop over the in-plane displacements alpha = 0,1
-	for(unsigned alpha = 0; alpha < 2; alpha++)
-	{
-	  // Loop over nodal equations
-	  for(unsigned j_node = 0; j_node < n_u_node; j_node++)
-	  {
-	    for(unsigned k_type = 0; k_type < n_u_nodal_type; k_type++)
-	    {
-	      // Get the local equation number associated with this dof, if it
-	      // is not pinned, add its contribution to the residuals
-	      int eqn_no = nodal_local_eqn(j_node, k_type);
-	      if(eqn_no>=0)
-	      {
-		// u_alpha - u_alpha_exact = 0
-		residuals[eqn_no] += (interpolated_u[alpha] - u_exact[alpha])
-		  * test_n_u(j_node, (alpha*n_u_nodal_type)+k_type) * W;
+        //--- In-plane equations --------
+        // Loop over the in-plane displacements alpha = 0,1
+        for (unsigned alpha = 0; alpha < 2; alpha++)
+        {
+          // Loop over nodal equations
+          for (unsigned j_node = 0; j_node < n_u_node; j_node++)
+          {
+            for (unsigned k_type = 0; k_type < n_u_nodal_type; k_type++)
+            {
+              // Get the local equation number associated with this dof, if it
+              // is not pinned, add its contribution to the residuals
+              int eqn_no = nodal_local_eqn(j_node, k_type);
+              if (eqn_no >= 0)
+              {
+                // u_alpha - u_alpha_exact = 0
+                residuals[eqn_no] +=
+                  (interpolated_u[alpha] - u_exact[alpha]) *
+                  test_n_u(j_node, (alpha * n_u_nodal_type) + k_type) * W;
 
-		// Now the Jacobian
-		if(flag)
-		{
-		  // Loop over the nodal dofs
-		  for(unsigned jj_node = 0; jj_node < n_u_node; jj_node++)
-		  {
-		    for(unsigned kk_type = 0;
-			kk_type < n_u_nodal_type; kk_type++)
-		    {
-		      // Get the eqn number associated with this dof, if it is
-		      // not pinned, add its contribution to the jacobian
-		      int dof_no =
-			nodal_local_eqn(jj_node, (alpha*n_u_nodal_type)+kk_type);
-		      if(dof_no>=0)
-		      {
-			jacobian(eqn_no,dof_no) +=
-			  psi_n_u(jj_node, (alpha*n_u_nodal_type)+kk_type)
-			  * test_n_u(j_node, (alpha*n_u_nodal_type)+k_type) * W;
-		      }
-		    }
-		  }
+                // Now the Jacobian
+                if (flag)
+                {
+                  // Loop over the nodal dofs
+                  for (unsigned jj_node = 0; jj_node < n_u_node; jj_node++)
+                  {
+                    for (unsigned kk_type = 0; kk_type < n_u_nodal_type;
+                         kk_type++)
+                    {
+                      // Get the eqn number associated with this dof, if it is
+                      // not pinned, add its contribution to the jacobian
+                      int dof_no = nodal_local_eqn(
+                        jj_node, (alpha * n_u_nodal_type) + kk_type);
+                      if (dof_no >= 0)
+                      {
+                        jacobian(eqn_no, dof_no) +=
+                          psi_n_u(jj_node, (alpha * n_u_nodal_type) + kk_type) *
+                          test_n_u(j_node, (alpha * n_u_nodal_type) + k_type) *
+                          W;
+                      }
+                    }
+                  }
 
-		  // [IN-PLANE-INTERNAL]
-		  // Internal dof contributions to u would need to be added
+                  // [IN-PLANE-INTERNAL]
+                  // Internal dof contributions to u would need to be added
 
-		} // End jacobian contributions
-	      }
-	    }
-	  } // End nodal equations
+                } // End jacobian contributions
+              }
+            }
+          } // End nodal equations
 
-	  // [IN-PLANE-INTERNAL]
-	  // If we ever add internal dof contributions to in-plane, we need to
-	  // add their equations here
+          // [IN-PLANE-INTERNAL]
+          // If we ever add internal dof contributions to in-plane, we need to
+          // add their equations here
 
-	} // End in-plane equations
+        } // End in-plane equations
 
-	//--- Out-of-plane equations ----
-	// Loop over nodal equations
-	for (unsigned j_node = 0; j_node < n_w_node; j_node++)
-	{
-	  for (unsigned k_type = 0; k_type < n_w_nodal_type; k_type++)
-	  {
-	    // Get the local equation number associated with this dof, if it
-	    // is not pinned, add its contribution to the residuals
-	    int eqn_no = nodal_local_eqn(j_node, k_type);
-	    if (eqn_no >= 0)
-	    {
-	      // w - w_exact = 0
-	      residuals[eqn_no] += (interpolated_w[0] - u_exact[2]) *
-		test_n_w(j_node, k_type) * W;
+        //--- Out-of-plane equations ----
+        // Loop over nodal equations
+        for (unsigned j_node = 0; j_node < n_w_node; j_node++)
+        {
+          for (unsigned k_type = 0; k_type < n_w_nodal_type; k_type++)
+          {
+            // Get the local equation number associated with this dof, if it
+            // is not pinned, add its contribution to the residuals
+            int eqn_no = nodal_local_eqn(j_node, k_type);
+            if (eqn_no >= 0)
+            {
+              // w - w_exact = 0
+              residuals[eqn_no] +=
+                (interpolated_w[0] - u_exact[2]) * test_n_w(j_node, k_type) * W;
 
-	      // Now the Jacobian
-	      if(flag)
-	      {
-		// Jac contribution from the nodal dofs
-		for(unsigned jj_node = 0; jj_node < n_w_node; jj_node++)
-		{
-		  for(unsigned kk_type = 0; kk_type < n_w_nodal_type; kk_type++)
-		  {
-		    // If this dof isn't pinned add its contribution to the
-		    // jacobian
-		    int dof_no = nodal_local_eqn(jj_node, kk_type + 2);
-		    if(dof_no>=0)
-		    {
-		      jacobian(eqn_no,dof_no) += psi_n_w(jj_node, kk_type)
-			* test_n_w(j_node, k_type) * W;
-		    }
-		  }
-		} // End nodal contribution to nodal equation jac
-		// Jac contribution from the internal dofs
-		for(unsigned kk_type = 0; kk_type < n_w_internal_type; kk_type++)
-		{
-		  // If this dof isn't pinned add its contribution to the
-		  // jacobian
-		  int dof_no = internal_local_eqn(w_index,kk_type);
-		  if(dof_no>=0)
-		  {
-		    jacobian(eqn_no,dof_no) += psi_i_w(kk_type)
-		      * test_n_w(j_node, k_type) * W;
-		  }
-		} // End internal contribution to nodal equation jac
-	      } // End nodal jac
-	    }
-	  }
-	} // End out-of-plane nodal equations
+              // Now the Jacobian
+              if (flag)
+              {
+                // Jac contribution from the nodal dofs
+                for (unsigned jj_node = 0; jj_node < n_w_node; jj_node++)
+                {
+                  for (unsigned kk_type = 0; kk_type < n_w_nodal_type;
+                       kk_type++)
+                  {
+                    // If this dof isn't pinned add its contribution to the
+                    // jacobian
+                    int dof_no = nodal_local_eqn(jj_node, kk_type + 2);
+                    if (dof_no >= 0)
+                    {
+                      jacobian(eqn_no, dof_no) += psi_n_w(jj_node, kk_type) *
+                                                  test_n_w(j_node, k_type) * W;
+                    }
+                  }
+                } // End nodal contribution to nodal equation jac
+                // Jac contribution from the internal dofs
+                for (unsigned kk_type = 0; kk_type < n_w_internal_type;
+                     kk_type++)
+                {
+                  // If this dof isn't pinned add its contribution to the
+                  // jacobian
+                  int dof_no = internal_local_eqn(w_index, kk_type);
+                  if (dof_no >= 0)
+                  {
+                    jacobian(eqn_no, dof_no) +=
+                      psi_i_w(kk_type) * test_n_w(j_node, k_type) * W;
+                  }
+                } // End internal contribution to nodal equation jac
+              } // End nodal jac
+            }
+          }
+        } // End out-of-plane nodal equations
 
-	// Loop over out-of-plane internal equations
-	for (unsigned k_type = 0; k_type < n_w_internal_type; k_type++)
-	{
-	  // Get the local equation number associated with this dof, if it
-	  // is not pinned, add its contribution to the residuals
-	  int eqn_no = internal_local_eqn(w_index, k_type);
-	  if (eqn_no >= 0)
-	  {
-	    // w - w_exact = 0
-	    residuals[eqn_no] +=
-	      (interpolated_w[0] - u_exact[2]) * test_i_w(k_type) * W;
+        // Loop over out-of-plane internal equations
+        for (unsigned k_type = 0; k_type < n_w_internal_type; k_type++)
+        {
+          // Get the local equation number associated with this dof, if it
+          // is not pinned, add its contribution to the residuals
+          int eqn_no = internal_local_eqn(w_index, k_type);
+          if (eqn_no >= 0)
+          {
+            // w - w_exact = 0
+            residuals[eqn_no] +=
+              (interpolated_w[0] - u_exact[2]) * test_i_w(k_type) * W;
 
-	    // Now the Jacobian
-	    if (flag)
-	    {
-	      // Jac contribution from the nodal dofs
-	      for (unsigned jj_node = 0; jj_node < n_w_node; jj_node++)
-	      {
-		for (unsigned kk_type = 0; kk_type < n_w_nodal_type; kk_type++)
-		{
-		  // If this dof isn't pinned add its contribution to the
-		  // jacobian
-		  int dof_no = nodal_local_eqn(jj_node, kk_type + 2);
-		  if (dof_no >= 0)
-		  {
-		    jacobian(eqn_no, dof_no) +=
-		      psi_n_w(jj_node, kk_type) * test_i_w(k_type) * W;
-		  }
-		}
-	      }
-	      // Jac contribution from the internal dofs
-	      for (unsigned kk_type = 0; kk_type < n_w_internal_type; kk_type++)
-	      {
-		// If this dof isn't pinned add its contribution to the
-		// jacobian
-		int dof_no = internal_local_eqn(w_index, kk_type);
-		if (dof_no >= 0)
-		{
-		  jacobian(eqn_no, dof_no) +=
-		    psi_i_w(kk_type) * test_i_w(k_type) * W;
-		}
-	      } // End internal contribution to internal equation jac
-	    } // End internal jac
-	  }
-	} // End out-of-plane internal equations
+            // Now the Jacobian
+            if (flag)
+            {
+              // Jac contribution from the nodal dofs
+              for (unsigned jj_node = 0; jj_node < n_w_node; jj_node++)
+              {
+                for (unsigned kk_type = 0; kk_type < n_w_nodal_type; kk_type++)
+                {
+                  // If this dof isn't pinned add its contribution to the
+                  // jacobian
+                  int dof_no = nodal_local_eqn(jj_node, kk_type + 2);
+                  if (dof_no >= 0)
+                  {
+                    jacobian(eqn_no, dof_no) +=
+                      psi_n_w(jj_node, kk_type) * test_i_w(k_type) * W;
+                  }
+                }
+              }
+              // Jac contribution from the internal dofs
+              for (unsigned kk_type = 0; kk_type < n_w_internal_type; kk_type++)
+              {
+                // If this dof isn't pinned add its contribution to the
+                // jacobian
+                int dof_no = internal_local_eqn(w_index, kk_type);
+                if (dof_no >= 0)
+                {
+                  jacobian(eqn_no, dof_no) +=
+                    psi_i_w(kk_type) * test_i_w(k_type) * W;
+                }
+              } // End internal contribution to internal equation jac
+            } // End internal jac
+          }
+        } // End out-of-plane internal equations
 
-	// Now break so that we don't do the rest of
-	break;
+        // Now break so that we don't do the rest of
+        break;
       }
 
 
@@ -627,13 +631,12 @@ namespace oomph
                   d2test_n_wdxi2(j_node, k_type, alpha + beta) * W;
                 // w_{,\alpha\alpha} \delta \kappa_\beta\beta
                 residuals[local_eqn] +=
-                  (nu) * interpolated_d2wdxi2(0, beta + beta) *
+                  (nu)*interpolated_d2wdxi2(0, beta + beta) *
                   d2test_n_wdxi2(j_node, k_type, alpha + alpha) * W;
                 // sigma_{\alpha\beta} w_{,\alpha} \delta w_{,\beta}
-                residuals[local_eqn] +=
-		  eta * sigma(alpha, beta) *
-		  interpolated_dwdxi(0, alpha) *
-		  dtest_n_wdxi(j_node, k_type, beta) * W;
+                residuals[local_eqn] += eta * sigma(alpha, beta) *
+                                        interpolated_dwdxi(0, alpha) *
+                                        dtest_n_wdxi(j_node, k_type, beta) * W;
               }
             }
 
@@ -787,8 +790,7 @@ namespace oomph
                       // The Linear Terms
                       // w_{,\alpha\beta} \delta \kappa_\alpha\beta
                       jacobian(local_eqn, local_unknown) +=
-                        (1.0 - nu) *
-			d2psi_i_wdxi2(k_type2, alpha + beta) *
+                        (1.0 - nu) * d2psi_i_wdxi2(k_type2, alpha + beta) *
                         d2test_n_wdxi2(j_node, k_type, alpha + beta) * W;
                       // w_{,\alpha\alpha} \delta \kappa_\beta\beta
                       jacobian(local_eqn, local_unknown) +=
@@ -796,8 +798,7 @@ namespace oomph
                         d2test_n_wdxi2(j_node, k_type, alpha + alpha) * W;
                       // Nonlinear terms
                       jacobian(local_eqn, local_unknown) +=
-                        eta * sigma(alpha, beta) *
-			dpsi_i_wdxi(k_type2, alpha) *
+                        eta * sigma(alpha, beta) * dpsi_i_wdxi(k_type2, alpha) *
                         dtest_n_wdxi(j_node, k_type, beta) * W;
                       // Nonlinear terms
                       jacobian(local_eqn, local_unknown) +=
@@ -850,18 +851,17 @@ namespace oomph
             for (unsigned beta = 0; beta < 2; ++beta)
             {
               // w_{,\alpha\beta} \delta \kappa_\alpha\beta
-              residuals[local_eqn] +=
-		(1.0 - nu) * interpolated_d2wdxi2(0, alpha + beta) *
-		d2test_i_wdxi2(k_type, alpha + beta) * W;
+              residuals[local_eqn] += (1.0 - nu) *
+                                      interpolated_d2wdxi2(0, alpha + beta) *
+                                      d2test_i_wdxi2(k_type, alpha + beta) * W;
               // w_{,\alpha\alpha} \delta \kappa_\beta\beta
               residuals[local_eqn] +=
-                (nu) * interpolated_d2wdxi2(0, beta + beta) *
+                (nu)*interpolated_d2wdxi2(0, beta + beta) *
                 d2test_i_wdxi2(k_type, alpha + alpha) * W;
               // sigma_{\alpha\beta} w_\alpha \delta w_{,\beta}
-              residuals[local_eqn] +=
-		eta * sigma(alpha, beta) *
-		interpolated_dwdxi(0, alpha) *
-		dtest_i_wdxi(k_type, beta) * W;
+              residuals[local_eqn] += eta * sigma(alpha, beta) *
+                                      interpolated_dwdxi(0, alpha) *
+                                      dtest_i_wdxi(k_type, beta) * W;
             }
           }
 
@@ -895,8 +895,7 @@ namespace oomph
                           jacobian(local_eqn, local_unknown) +=
                             eta * nu * dpsi_n_udxi(jj_node, kk_type, gamma) *
                             interpolated_dwdxi(0, alpha) *
-                            dtest_i_wdxi(k_type, beta) /
-			    (1.0 - nu * nu) * W;
+                            dtest_i_wdxi(k_type, beta) / (1.0 - nu * nu) * W;
                         }
                         if (alpha == gamma)
                         {
@@ -904,8 +903,7 @@ namespace oomph
                             eta * (1.0 - nu) / 2.0 *
                             dpsi_n_udxi(jj_node, kk_type, beta) *
                             interpolated_dwdxi(0, alpha) *
-                            dtest_i_wdxi(k_type, beta) /
-			    (1.0 - nu * nu) * W;
+                            dtest_i_wdxi(k_type, beta) / (1.0 - nu * nu) * W;
                         }
                         if (beta == gamma)
                         {
@@ -913,8 +911,7 @@ namespace oomph
                             eta * (1.0 - nu) / 2.0 *
                             dpsi_n_udxi(jj_node, kk_type, alpha) *
                             interpolated_dwdxi(0, alpha) *
-                            dtest_i_wdxi(k_type, beta) /
-			    (1.0 - nu * nu) * W;
+                            dtest_i_wdxi(k_type, beta) / (1.0 - nu * nu) * W;
                         }
                       } // End of loop over beta
                     } // End of loop over alpha
@@ -1246,7 +1243,6 @@ namespace oomph
   } // End of fill_in_generic_residual_contribution_foeppl_von_karman
 
 
-
   //======================================================================
   /// Self-test:  Return 0 for OK
   //======================================================================
@@ -1354,8 +1350,9 @@ namespace oomph
       }
 
       // Loop for variables
-      for (Vector<double>::iterator it = interpolated_vals.begin()
-	     ; it != interpolated_vals.end(); ++it)
+      for (Vector<double>::iterator it = interpolated_vals.begin();
+           it != interpolated_vals.end();
+           ++it)
       {
         outfile << *it << " ";
       }
@@ -1420,10 +1417,11 @@ namespace oomph
       }
 
       // Output the interpolated unknowns
-      Vector<double> interpolated_vals(n_unknown,0.0);
+      Vector<double> interpolated_vals(n_unknown, 0.0);
       interpolated_vals = interpolated_fvk_disp_and_deriv(s);
       for (Vector<double>::iterator it = interpolated_vals.begin();
-	   it != interpolated_vals.end(); ++it)
+           it != interpolated_vals.end();
+           ++it)
       {
         outfile << *it << " ";
       }
@@ -1432,7 +1430,6 @@ namespace oomph
     // Write tecplot footer (e.g. FE connectivity lists)
     this->write_tecplot_zone_footer(outfile, nplot);
   }
-
 
 
   //======================================================================
@@ -1473,18 +1470,17 @@ namespace oomph
       }
 
       // Output the interpolated unknowns
-      Vector<double> interpolated_vals(n_unknown,0.0);
+      Vector<double> interpolated_vals(n_unknown, 0.0);
       interpolated_vals = interpolated_fvk_disp_and_deriv(s);
       for (unsigned i = 0; i < n_unknown; i++)
       {
-	fprintf(file_pt, "%g \n", interpolated_vals[i]);
+        fprintf(file_pt, "%g \n", interpolated_vals[i]);
       }
     }
 
     // Write tecplot footer (e.g. FE connectivity lists)
     this->write_tecplot_zone_footer(file_pt, nplot);
   }
-
 
 
   //======================================================================

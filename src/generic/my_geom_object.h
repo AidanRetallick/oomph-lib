@@ -133,9 +133,7 @@ namespace oomph
 
     /// Constructor: Straight line between x0 and x1
     CurvilineLine(const Vector<double>& x0, const Vector<double>& x1)
-      : CurvilineGeomObject(),
-	X0(x0),
-	X1(x1)
+      : CurvilineGeomObject(), X0(x0), X1(x1)
     {
       // Do nothing
     }
@@ -156,15 +154,14 @@ namespace oomph
     virtual ~CurvilineLine() {}
 
     /// Access function to set the start of the line
-    void set_ends(const Vector<double> &x0, const Vector<double> &x1)
+    void set_ends(const Vector<double>& x0, const Vector<double>& x1)
     {
       X0 = x0;
       X1 = x1;
     }
 
     /// Position Vector w.r.t. to zeta:
-    virtual void position(const Vector<double>& zeta,
-			  Vector<double>& r) const
+    virtual void position(const Vector<double>& zeta, Vector<double>& r) const
     {
       r[0] = (1.0 - zeta[0]) * X0[0] + zeta[0] * X1[0];
       r[1] = (1.0 - zeta[0]) * X0[1] + zeta[0] * X1[1];

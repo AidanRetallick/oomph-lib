@@ -73,13 +73,11 @@ namespace oomph
   public:
     /// A pointer to a scalar function of the position. Can be used for
     /// out-of-plane forcing, swelling, isotropic-prestrain, etc.
-    typedef void (*ScalarFctPt)(const Vector<double>& x,
-				double& f);
+    typedef void (*ScalarFctPt)(const Vector<double>& x, double& f);
 
     /// A pointer to a vector function of the position. Can be used for
     /// in-of-plane forcing, anisotropic-prestrain, etc.
-    typedef void (*VectorFctPt)(const Vector<double>& x,
-                                Vector<double>& f);
+    typedef void (*VectorFctPt)(const Vector<double>& x, Vector<double>& f);
 
     /// Function pointer to the Error Metric we are using
     /// e.g could be that we are just interested in error on w etc.
@@ -197,16 +195,13 @@ namespace oomph
   protected:
     /// (pure virtual) In-plane basis functions and derivatives w.r.t. global
     /// coords at local coordinate s; return det(Jacobian of mapping)
-    virtual double basis_u_foeppl_von_karman(
-      const Vector<double>& s,
-      Shape& psi_n) const = 0;
+    virtual double basis_u_foeppl_von_karman(const Vector<double>& s,
+                                             Shape& psi_n) const = 0;
 
     /// (pure virtual) In-plane basis functions and derivatives w.r.t. global
     /// coords at local coordinate s; return det(Jacobian of mapping)
     virtual double dbasis_u_eulerian_foeppl_von_karman(
-      const Vector<double>& s,
-      Shape& psi_n,
-      DShape& dpsi_n_dx) const = 0;
+      const Vector<double>& s, Shape& psi_n, DShape& dpsi_n_dx) const = 0;
 
     /// (pure virtual) In-plane basis/test functions at and derivatives w.r.t
     /// global coords at local coordinate s; return det(Jacobian of mapping)
@@ -218,10 +213,9 @@ namespace oomph
       DShape& dtest_n_dx) const = 0;
 
     /// (pure virtual) Out-of-plane basis functions at local coordinate s
-    virtual void basis_w_foeppl_von_karman(
-      const Vector<double>& s,
-      Shape& psi_n,
-      Shape& psi_i) const = 0;
+    virtual void basis_w_foeppl_von_karman(const Vector<double>& s,
+                                           Shape& psi_n,
+                                           Shape& psi_i) const = 0;
 
     /// (pure virtual) Out-of-plane basis functions and derivs w.r.t. global
     /// coords at local coordinate s; return det(Jacobian of mapping)
@@ -235,12 +229,11 @@ namespace oomph
       DShape& d2psi_i_dx2) const = 0;
 
     /// (pure virtual) Out-of-plane basis/test functions at local coordinate s
-    virtual void basis_and_test_w_foeppl_von_karman(
-      const Vector<double>& s,
-      Shape& psi_n,
-      Shape& psi_i,
-      Shape& test_n,
-      Shape& test_i) const = 0;
+    virtual void basis_and_test_w_foeppl_von_karman(const Vector<double>& s,
+                                                    Shape& psi_n,
+                                                    Shape& psi_i,
+                                                    Shape& test_n,
+                                                    Shape& test_i) const = 0;
 
     /// (pure virtual) Out-of-plane basis/test functions and first derivs w.r.t.
     /// to global coords at local coordinate s; return det(Jacobian of mapping)
@@ -286,7 +279,7 @@ namespace oomph
       : Pressure_fct_pt(0),
         In_plane_forcing_fct_pt(0),
         Swelling_fct_pt(0),
-	Solve_u_exact(false),
+        Solve_u_exact(false),
         Error_metric_fct_pt(0),
         Multiple_error_metric_fct_pt(0),
         U_is_damped(false),
@@ -629,7 +622,7 @@ namespace oomph
       get_u_exact_pt(u_exact_function_pt);
 
       // Call the exact function at x and assign it to u
-      (*u_exact_function_pt)(x,u_exact);
+      (*u_exact_function_pt)(x, u_exact);
     }
 
     /// Activate the alternative residuals which are used to solve for an exact
@@ -637,12 +630,12 @@ namespace oomph
     void activate_u_exact_solve()
     {
       // Throw an error if we haven't set a function pointer for u_exact yet
-      if(!U_exact_pt)
+      if (!U_exact_pt)
       {
-	throw OomphLibError("You need to set U_exact_pt before activating\
+        throw OomphLibError("You need to set U_exact_pt before activating\
  Solve_u_exact",
-			    OOMPH_EXCEPTION_LOCATION,
-			    OOMPH_CURRENT_FUNCTION);
+                            OOMPH_EXCEPTION_LOCATION,
+                            OOMPH_CURRENT_FUNCTION);
       }
       // Set the alternative equations flag to be true
       Solve_u_exact = true;
@@ -1319,7 +1312,7 @@ namespace oomph
 
     /// Add the element's contribution to its residual vector for the
     /// alternative problem of (ux,uy,w) = (ux_exact,uy_exact,w_exact)
-    void fill_in_contribution_to_residual_u_exact(Vector<double> &residuals);
+    void fill_in_contribution_to_residual_u_exact(Vector<double>& residuals);
 
     /// Pointer to pressure function:
     ScalarFctPt Pressure_fct_pt;

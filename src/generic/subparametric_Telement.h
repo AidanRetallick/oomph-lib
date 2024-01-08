@@ -769,8 +769,8 @@ Elements.",
           // [zdec] debug
           oomph_info << "Upgrading to a 5-er" << std::endl;
           add_new_curved_basis<BernadouElementBasis<5>>();
-	  // [zdec] INTEGRATION SCHEME HAS EXTERNAL KNOTS
-          //new_integral_pt = new TGauss<2, 16>;
+          // [zdec] INTEGRATION SCHEME HAS EXTERNAL KNOTS
+          // new_integral_pt = new TGauss<2, 16>;
           new_integral_pt = new TGauss<2, 13>;
           break;
         default:
