@@ -3,7 +3,7 @@
 // LIC// multi-physics finite-element library, available
 // LIC// at http://www.oomph-lib.org.
 // LIC//
-// LIC// Copyright (C) 2006-2023 Matthias Heil and Andrew Hazel
+// LIC// Copyright (C) 2006-2024 Matthias Heil and Andrew Hazel
 // LIC//
 // LIC// This library is free software; you can redistribute it and/or
 // LIC// modify it under the terms of the GNU Lesser General Public
@@ -93,18 +93,22 @@ namespace oomph
 
     // [zdec] work in progress
     /// Divide an element into three by creating edges from the centroid to
-    /// each of the vertex nodes
+    /// each of the vertex nodes. Take the old element pointer and fill out
+    /// vectors containing pointers to the new three elements and all the
+    /// nodes. Optionally takes a pointer to a timestepper to pass on to the
+    /// new elements and nodes.
     template<class ELEMENT>
-    void split_element_through_centroid(TimeStepper* const& time_stepper_pt,
-                                        FiniteElement* const& el_pt,
-                                        Vector<FiniteElement*>& new_el_pt,
-                                        Vector<Node*>& new_nod_pt);
+    void split_element_through_centroid(
+      FiniteElement* const& el_pt,
+      Vector<FiniteElement*>& new_el_pt,
+      Vector<Node*>& new_nod_pt,
+      TimeStepper* const& time_stepper_pt = &Mesh::Default_TimeStepper);
 
     /// Make sure no elements have two boundary edges by splitting them through
-    /// their centroid (e.g. no corner elements straddling both boundaries)
+    /// their centroid (e.g. no corner elements straddling two boundaries).
     template<class ELEMENT>
     void split_elements_with_multiple_boundary_edges(
-      TimeStepper* const& time_stepper_pt);
+      TimeStepper* const& time_stepper_pt = &Mesh::Default_TimeStepper);
 
     /// Setup lookup schemes which establish which elements are located
     /// next to mesh's boundaries. Doc in outfile (if it's open).
@@ -285,23 +289,23 @@ namespace oomph
 
   //==========================================================================
   /// Divide an element into three by creating edges from the centroid to
-  /// each of the vertex nodes
+  /// each of the vertex nodes. Takes an element pointer
   //==========================================================================
   template<class ELEMENT>
   void TriangleMeshBase::split_element_through_centroid(
-    TimeStepper* const& time_stepper_pt,
     FiniteElement* const& el_pt,
     Vector<FiniteElement*>& new_el_pt,
-    Vector<Node*>& new_nod_pt)
+    Vector<Node*>& new_nod_pt,
+    TimeStepper* const& time_stepper_pt)
   {
 #ifdef PARANOID
-    // Check that the element belongs to this mesh (this seems like a good idea)
+    // Maybe check that the element belongs to this mesh?
+    // (this seems like a good idea)
 #endif
 
     // Get the type of triangle element we are using
     unsigned n_node_1d = el_pt->nnode_1d();
     unsigned dim = el_pt->dim();
-
 
     // We split the element depending on the number of nodes
     switch (n_node_1d)
@@ -315,8 +319,8 @@ namespace oomph
         //  | \                         |\\             //
         //  |   \                       | \ \           //
         //  |     \          becomes:   |  \  \         //
-        //  |       \            	|   c_  \       //
-        //  |         \          	| /    - _\     //
+        //  |       \                   |   c_  \       //
+        //  |         \                 | /    - _\     //
         //  o0----------o1              o0----------o1  //
 
         //-----------------------------------------------------------------------
@@ -413,7 +417,7 @@ namespace oomph
         //  | /    (el 2)      - _\     //
         //  o0----------o3----------o1  //
 
-        //-----------------------------------------------------------------------
+        //---------------------------------------------------------------------
         // We start by creating the new elements
         FiniteElement* el0_pt = new ELEMENT;
         FiniteElement* el1_pt = new ELEMENT;
@@ -497,14 +501,14 @@ namespace oomph
 
       case 4:
       {
-        // In this case, we retain the original 10 nodes o_j and  need to create
-        // 9 new nodes: two for each of the three new edges that join the new
-        // elements a_i and b_i, and three mode at the centroids of each new
-        // element c_i for i=0,1,2.
+        // In this case, we retain the original 10 nodes o_j and  need to
+        // create 9 new nodes: two for each of the three new edges that join
+        // the new elements a_i and b_i, and three mode at the centroids of
+        // each new element c_i for i=0,1,2.
         //
         // [zdec] IMPORTANT: o9 may need resizing as it is the only node to go
         // from a centre node to a vertex node (changing type). To account for
-        // this, we reconstruct it immediately.
+        // this, we reconstruct it.
         //
         // The original element:
         //
@@ -553,7 +557,7 @@ namespace oomph
         //  | /                             - \    //
         //  o0----------o3----------o4----------o1 //
 
-        //-----------------------------------------------------------------------
+        //---------------------------------------------------------------------
         // We start by creating the new elements
         FiniteElement* el0_pt = new ELEMENT;
         FiniteElement* el1_pt = new ELEMENT;
@@ -580,7 +584,7 @@ namespace oomph
         // Copy the position
         o9_pt->x(0) = o9_temp_pt->x(0);
         o9_pt->x(1) = o9_temp_pt->x(1);
-        // Delete the original node
+        // Delete the original centre node
         delete o9_temp_pt;
         o9_temp_pt = 0;
 
@@ -681,31 +685,14 @@ namespace oomph
         el2_pt->node_pt(8) = a0_pt;
         // el2_pt->node_pt(9) = c2_pt;
 
-
-        // // [zdec] debug
-        // // We want to find out what boundaries each of the nodes are on
-        // for(unsigned e = 0; e < 3; e++)
-        // {
-        //   oomph_info << "Element " << e;
-        //   for(unsigned n = 0; n < 3; n++)
-        //   {
-        //     oomph_info << " node " << n << " is on boundaries: ";
-        //     for(unsigned b = 0; b < 3; b++)
-        //     {
-        //       if(new_el_pt[e]->node_pt(n)->is_on_boundary(b))
-        //       {oomph_info << b << " ";}
-        //       oomph_info << std::endl;
-        //     }
-        //   }
-        // }
         return;
       }
 
       default:
       {
         std::string error_message =
-          (std::string)("Triangle elements must have nnode_1d = 2,3 or 4.\
- This element returned nnode_1d() = ") +
+          (std::string)("Triangle elements must have nnode_1d = 2,3 or 4.\n"
+                        "This element returned nnode_1d() = ") +
           std::to_string(n_node_1d);
         throw OomphLibError(
           error_message, OOMPH_EXCEPTION_LOCATION, OOMPH_CURRENT_FUNCTION);
