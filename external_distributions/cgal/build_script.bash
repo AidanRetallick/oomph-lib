@@ -19,7 +19,6 @@ echo $*
 
 CGAL_PERMANENT_INSTALL_DIRECTORY=""
 if [ $# -eq 5 ]; then
-    echo  "bla"
     CGAL_PERMANENT_INSTALL_DIRECTORY=`pwd`
 elif [ $# -eq 6 ]; then
     CGAL_PERMANENT_INSTALL_DIRECTORY=$6
@@ -126,7 +125,7 @@ build_opts="-DWITH_GMP=true \
             -DMPFR_LIBRARIES=$mpfr_actual_library \
             -DBOOST_INCLUDEDIR=$boost_include \
             $src_dir"
-echo $build_opts
+echo "build options: "$build_opts
 cmake $build_opts
 make
 
