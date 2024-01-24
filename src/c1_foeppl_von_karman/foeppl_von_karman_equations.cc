@@ -28,7 +28,7 @@
 // LIC//
 // LIC//====================================================================
 // Non--inline functions for the foeppl_von_karman equations
-#include "foeppl_von_karman.h"
+#include "foeppl_von_karman_equations.h"
 
 namespace oomph
 {
@@ -53,8 +53,8 @@ namespace oomph
       const unsigned& flag)
   {
     // The indices of in-plane and out-of-plane unknowns
-    const unsigned n_u_fields = 2;
-    const unsigned n_w_fields = 1;
+    const unsigned n_u_displacements = 2;
+    const unsigned n_w_displacements = 1;
     const Vector<unsigned> u_indices = u_field_indices();
     const unsigned w_index = w_field_index();
 
@@ -190,14 +190,14 @@ namespace oomph
 
       //==========================INTERPOLATION=================================
       // Create space for in-plane interpolated unknowns
-      Vector<double> interpolated_u(n_u_fields, 0.0);
-      Vector<double> interpolated_dudt(n_u_fields, 0.0);
-      DenseMatrix<double> interpolated_dudxi(n_u_fields, n_deriv, 0.0);
+      Vector<double> interpolated_u(n_u_displacements, 0.0);
+      Vector<double> interpolated_dudt(n_u_displacements, 0.0);
+      DenseMatrix<double> interpolated_dudxi(n_u_displacements, n_deriv, 0.0);
       // Create space for out-of-plane interpolated unknowns
-      Vector<double> interpolated_w(n_w_fields, 0.0);
-      Vector<double> interpolated_dwdt(n_w_fields, 0.0);
-      DenseMatrix<double> interpolated_dwdxi(n_w_fields, n_deriv, 0.0);
-      DenseMatrix<double> interpolated_d2wdxi2(n_w_fields, n_2deriv, 0.0);
+      Vector<double> interpolated_w(n_w_displacements, 0.0);
+      Vector<double> interpolated_dwdt(n_w_displacements, 0.0);
+      DenseMatrix<double> interpolated_dwdxi(n_w_displacements, n_deriv, 0.0);
+      DenseMatrix<double> interpolated_d2wdxi2(n_w_displacements, n_2deriv, 0.0);
 
       //---Nodal contribution to the in-plane unknowns-------------------------
       // Loop over nodes used by in-plane fields
@@ -222,7 +222,7 @@ namespace oomph
         for (unsigned k_type = 0; k_type < n_u_nodal_type; k_type++)
         {
           // Loop over in-plane unknowns
-          for (unsigned alpha = 0; alpha < n_u_fields; alpha++)
+          for (unsigned alpha = 0; alpha < n_u_displacements; alpha++)
           {
             // --- Time derivative ---
             double nodal_dudt_value = 0.0;

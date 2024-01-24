@@ -32,10 +32,10 @@
 #define OOMPH_FVK_CURVABLE_BELL_ELEMENTS_HEADER
 
 #include "foeppl_von_karman_equations.h"
-#include "../generic/bell_element_basis.h"
-#include "../generic/c1_curved_elements.h"
-#include "../generic/my_geom_object.h"
-#include "../generic/subparametric_Telement.h"
+#include "src/generic/bell_element_basis.h"
+#include "src/generic/c1_curved_elements.h"
+#include "src/generic/my_geom_object.h"
+#include "src/generic/subparametric_Telement.h"
 #include "src/generic/oomph_definitions.h"
 
 // [zdec] TODO:
@@ -451,8 +451,6 @@ namespace oomph
 
       // Rotated dof helper
       Rotated_boundary_helper_pt = new RotatedBoundaryHelper(this);
-
-      Association_matrix_pt = 0;
     }
 
     /// Destructor: clean up alloacations
@@ -948,26 +946,10 @@ namespace oomph
     /// (always only w)
     static const std::vector<bool> Field_is_bell_interpolated;
 
-    /// Static int that holds the number of variables at
-    /// nodes: always the same
+    /// Array of static ints that holds the number of variables at
+    /// nodes: constant across elements but varies across nodes
     static const unsigned Initial_Nvalue[];
 
-    /// Enum to store which edge is curved set to none when element has no
-    /// curved edges
-    MyC1CurvedElements::Edge Curved_edge;
-
-    /// Pointer to Stored Association matrix
-    DenseMatrix<double>* Association_matrix_pt;
-
-    // // [zdec] old rotation
-    // /// A Pointer to the function that sets up the rotated basis at point x
-    // BasisVectorsFctPt Rotated_basis_fct_pt;
-
-    //   /// Which nodes are we rotating
-    //   Vector<unsigned> Nodes_to_rotate;
-
-    //   /// Number of nodes to rotate
-    //   unsigned Nnodes_to_rotate;
   };
 
 
