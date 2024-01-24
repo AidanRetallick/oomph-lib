@@ -2,14 +2,14 @@
 #-----------------------
 # Define the sources
 sources =  \
-foeppl_von_karman_equations.cc \
-foeppl_von_karman_curvable_bell_elements.cc
+ foeppl_von_karman_equations.cc \
+ foeppl_von_karman_curvable_bell_elements.cc
 
 # Define the headers
 headers =  \
-foeppl_von_karman.h \
-foeppl_von_karman_equations.h \
-foeppl_von_karman_curvable_bell_elements.h
+ foeppl_von_karman.h \
+ foeppl_von_karman_equations.h \
+ foeppl_von_karman_curvable_bell_elements.h
 
 # Define name of library
 libname = c1_foeppl_von_karman
@@ -45,7 +45,7 @@ library_include_HEADERS=$(headers)
 #-------------------
 # Include path for library headers -- need to refer to include files
 # in src as they will not have been installed yet! 
-#AM_CPPFLAGS += -I$(top_builddir)/src/generic
+AM_CPPFLAGS += -I$(top_builddir)/src/generic
 
 
 # Combined header file
@@ -80,7 +80,4 @@ clean-local:
 	rm -f $(libname).h
 distclean-local:
 	rm -f $(libname).h
-
-
-
 

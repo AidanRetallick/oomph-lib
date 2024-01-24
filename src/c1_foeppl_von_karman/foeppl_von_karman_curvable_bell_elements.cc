@@ -28,7 +28,7 @@
 // LIC//
 // LIC//====================================================================
 // Non--inline functions for BellFvK elements
-#include "foeppl_von_karman.h"
+#include "foeppl_von_karman_curvable_bell_elements.h"
 
 namespace oomph
 {
