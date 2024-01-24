@@ -2,76 +2,80 @@
 #-----------------------
 
 # Define the sources
-sourcesC1 =large_displacement_plate_equations.cc large_displacement_plate_curved_bell_elements.cc
+sources = \
+ koiter_steigmann_equations.cc \
+ koiter_steigmann_curvable_bell_elements.cc
 
 # Define the headers
-headersC1 = large_displacement_plate_models.h large_displacement_plate_elements.h large_displacement_plate_curved_bell_elements.h \
-koiter_steigmann_plate_elements.h foeppl_von_karman_correction_elements.h
+headers = 
+ koiter_steigmann.h \
+ koiter_steigmann_equations.h \
+ koiter_steigmann_curvable_bell_elements.h
 
 # Define name of library
-libnameC1 = C1_large_displacement_plate_models
+libname = c1_koiter_steigmann
 
 # Combine headers and sources
-headersC1_and_sourcesC1 = $(headersC1) $(sourcesC1)
+headers_and_sources = $(headers) $(sources)
 
 # Define the library that gets placed in lib directory
 #-----------------------------------------------------
-lib_LTLIBRARIES = libC1_large_displacement_plate_models.la
+lib_LTLIBRARIES = libc1_koiter_steigmann.la
 
 # Sources that the library depends on: 
 #-------------------------------------
-libC1_large_displacement_plate_models_la_SOURCES = $(headersC1_and_sourcesC1)
+libc1_koiter_steigmann_la_SOURCES = $(headers_and_sources)
 
 # The library's include headers:
 #-------------------------------
 # Headers that are to be included in the $(includedir) directory:
 # This is the combined header which contains "#include<...>" commands
 # for the real headers in the subdirectory below $(includedir)
-C1_large_displacement_plate_modelsinclude_HEADERS = $(libnameC1).h 
-C1_large_displacement_plate_modelsincludedir = $(includedir)
+include_HEADERS = $(libname).h 
 
 #Here's the subdirectory where the actual header files are placed
-library_C1_large_displacement_plate_modelsincludedir=$(includedir)/C1_large_displacement_plate_models
+library_includedir=$(includedir)/c1_koiter_steigmann
 
 #These are the header files that are to be placed in subdirectory
-library_C1_large_displacement_plate_modelsinclude_HEADERS=$(headersC1)
+library_include_HEADERS=$(headers)
 
-# Required libraries -- [assuming that we want to link against stuff in generic
-#-------------------     add other oomph-lib libraries if you need them....]
+# Required libraries 
+#-------------------
 # Include path for library headers -- need to refer to include files
-# in their respective source directories as they will not have been 
-# installed yet! 
+# in src as they will not have been installed yet! 
 AM_CPPFLAGS += -I$(top_builddir)/src/generic
 
 
 # Combined header file
 #---------------------
 # Rule for building combined header (dummy target never gets made so
-# the combined header is remade every time)
-$(libnameC1).h: dummy_$(libnameC1).h
-# $(libnameFvK).h: dummy_$(libnameFvK).h
+# the combined header is remade every time
+$(libname).h: dummy_$(libname).h
 
-dummy_$(libnameC1).h:  $(headersC1)
-	echo  $(libnameC1) $(headersC1) > all_$(libnameC1).aux
+dummy_$(libname).h:  $(headers)
+	echo  $(libname) $(headers) > all_$(libname).aux
 	$(AWK) -f $(top_builddir)/bin/headers.awk < \
-	       all_$(libnameC1).aux > $(libnameC1).h
-	rm all_$(libnameC1).aux
+	       all_$(libname).aux > $(libname).h
+	rm all_$(libname).aux
+
 
 # Extra hook for install: Optionally replace headers by symbolic links
 #---------------------------------------------------------------------
 if SYMBOLIC_LINKS_FOR_HEADERS
 install-data-hook: 
-	(cd $(library_C1_large_displacement_plate_modelsincludedir) && rm -f $(headersC1) )
-	(echo "$(headersC1)" > include_files.list )
+	(cd $(library_includedir) && rm -f $(headers) )
+	(echo "$(headers)" > include_files.list )
 	($(top_builddir)/bin/change_headers_to_links.sh `pwd`)
-	($(LN_S) `cat include_files.list.aux` $(library_C1_large_displacement_plate_modelsincludedir) )
+	($(LN_S) `cat include_files.list.aux` $(library_includedir) )
 	(rm -r include_files.list.aux include_files.list ) 
 else
 install-data-hook: 
 endif
 
 
-# Tidy up
-#--------
-clean-local:
-	rm -f $(libnameC1).h
+# Cleanup: Kill automatically generated combined header file
+clean-local: 
+	rm -f $(libname).h
+distclean-local:
+	rm -f $(libname).h
+
