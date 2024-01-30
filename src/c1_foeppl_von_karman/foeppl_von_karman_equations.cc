@@ -1547,7 +1547,7 @@ namespace oomph
 
     // Write tecplot footer (e.g. FE connectivity lists)
     this->write_tecplot_zone_footer(outfile, nplot);
-  }
+  } // End of output_fct(...)
 
 
   //======================================================================
@@ -1788,5 +1788,509 @@ namespace oomph
       norm += tmp1 * W;
       error += tmp2 * W;
     } // End of loop over integration pts
+  } // End of compute_error(...)
+
+
+  //============================================================================
+  /// Return FE representation of the three displacements at local coordinate
+  /// s
+  ///   0: u_x
+  ///   1: u_y
+  ///   2: w
+  //============================================================================
+  Vector<double> FoepplVonKarmanEquations::interpolated_fvk_disp(
+    const Vector<double>& s) const
+  {
+    // The number of in-plane and out-of-plane unknowns
+    const unsigned n_u_displacements = 2;
+    const unsigned n_w_displacements = 1;
+
+    // Find the dimension of the element
+    const unsigned dim = this->dim();
+
+    // Find out how many nodes there are for each field
+    const unsigned n_u_node = nu_node();
+    const unsigned n_w_node = nw_node();
+
+    // Get the vector of nodes used for each field
+    const Vector<unsigned> u_nodes = get_u_node_indices();
+    const Vector<unsigned> w_nodes = get_w_node_indices();
+
+    // Find out how many basis types there are at each node
+    const unsigned n_u_nodal_type = nu_type_at_each_node();
+    const unsigned n_w_nodal_type = nw_type_at_each_node();
+
+    // Find out how many basis types there are internally
+    // NOTE: In general, the in-plane basis may require internal basis/test
+    // functions however, no such basis has been used so far and so this is
+    // not implemented. Comments marked with "[IN-PLANE-INTERNAL]" indicate
+    // locations where changes must be made in the case that internal data is
+    // used for the in-plane unknowns.
+    const unsigned n_u_internal_type = nu_type_internal();
+    const unsigned n_w_internal_type = nw_type_internal();
+
+#ifdef PARANOID
+    // [IN-PLANE-INTERNAL]
+    // This PARANOID block should be deleted if/when internal in-plane
+    // contributions have been implemented
+
+    // Throw an error if the number of internal in-plane basis types is
+    // non-zero
+    if (n_u_internal_type != 0)
+    {
+      throw OomphLibError("The number of internal basis types for u is non-zero\
+ but this functionality is not yet implemented. If you want to implement this\
+ look for comments containing the tag [IN-PLANE-INTERNAL].",
+                          OOMPH_CURRENT_FUNCTION,
+                          OOMPH_EXCEPTION_LOCATION);
+    }
+#endif
+
+    // In-plane local basis & test functions
+    // ------------------------------------------
+    // Local in-plane nodal basis and test functions
+    Shape psi_n_u(n_u_node, n_u_nodal_type);
+    // [IN-PLANE-INTERNAL]
+    // // Local in-plane internal basis and test functions
+    // Shape psi_i_u(n_u_internal_type);
+
+    // Out-of-plane local basis & test functions
+    // ------------------------------------------
+    // Nodal basis & test functions
+    Shape psi_n_w(n_w_node, n_w_nodal_type);
+    Shape test_n_w(n_w_node, n_w_nodal_type);
+    // Internal basis & test functions
+    Shape psi_i_w(n_w_internal_type);
+    Shape test_i_w(n_w_internal_type);
+
+    // Allocate and find global x
+    Vector<double> interp_x(dim, 0.0);
+    interpolated_x(s, interp_x);
+
+    // Call the derivatives of the shape and test functions for the out of
+    // plane unknown
+    basis_w_foeppl_von_karman(s, psi_n_w, psi_i_w);
+
+    // [IN-PLANE-INTERNAL]
+    // This does not include internal basis functions for u. If they are
+    // needed they must be added (as above for w)
+    basis_u_foeppl_von_karman(s, psi_n_u);
+
+
+    //======================= INTERPOLATION =================================
+
+    // Create space for in-plane interpolated unknowns
+    Vector<double> interpolated_u(n_u_displacements, 0.0);
+    // Create space for out-of-plane interpolated unknowns
+    Vector<double> interpolated_w(n_w_displacements, 0.0);
+
+    //---Nodal contribution to the in-plane unknowns--------------------------
+    // Loop over nodes used by in-plane fields
+    for (unsigned j_node = 0; j_node < n_u_node; j_node++)
+    {
+      // Get the j-th node used by in-plane fields
+      unsigned j_node_local = u_nodes[j_node];
+
+      // Loop over types
+      for (unsigned k_type = 0; k_type < n_u_nodal_type; k_type++)
+      {
+        // Loop over in-plane unknowns
+        for (unsigned alpha = 0; alpha < n_u_displacements; alpha++)
+        {
+          // Get the nodal value of type k
+          double u_value =
+            get_u_alpha_value_at_node_of_type(alpha, j_node_local, k_type);
+
+          // --- Displacement ---
+          // Add nodal contribution of type k to the interpolated displacement
+          interpolated_u[alpha] += u_value * psi_n_u(j_node, k_type);
+
+        } // End of loop over the index of u -- alpha
+      } // End of loop over the types -- k_type
+    } // End of loop over the nodes -- j_node
+
+
+    //---Internal contribution to the in-plane
+    // unknowns-------------------------
+    // [IN-PLANE-INTERNAL]
+    // Internal contributions to in-plane interpolation not written
+
+
+    //---Nodal contribution to the out-of-plane
+    // unknowns------------------------
+    for (unsigned j_node = 0; j_node < n_w_node; j_node++)
+    {
+      // Get the j-th node used by in-plane fields
+      unsigned j_node_local = w_nodes[j_node];
+
+      // Loop over types
+      for (unsigned k_type = 0; k_type < n_w_nodal_type; k_type++)
+      {
+        // Get the nodal value of type k
+        double w_value = get_w_value_at_node_of_type(j_node_local, k_type);
+
+        // --- Displacement ---
+        // Add nodal contribution of type k to the interpolated displacement
+        interpolated_w[0] += w_value * psi_n_w(j_node, k_type);
+
+      } // End of loop over the types -- k_type
+    } // End of loop over the nodes -- j_node
+
+    //---Internal contribution to the out-of-plane field----------------------
+    // Loop over the internal data types
+    for (unsigned k_type = 0; k_type < n_w_internal_type; k_type++)
+    {
+      // Get the nodal value of type k
+      double w_value = get_w_internal_value_of_type(k_type);
+
+      // --- Displacement ---
+      // Add nodal contribution of type k to the interpolated displacement
+      interpolated_w[0] += w_value * psi_i_w(k_type);
+
+    } // End of loop over internal types -- k_type
+
+    //====================== END OF INTERPOLATION ============================
+
+    // Copy our interpolated fields into the order we want and return them.
+    Vector<double> interpolated_vals(12, 0.0);
+    interpolated_vals[0] = interpolated_u[0]; // ux
+    interpolated_vals[1] = interpolated_u[1]; // uy
+    interpolated_vals[2] = interpolated_w[0]; // w
+    return (interpolated_vals);
+  } // end of interpolated_fvk_disp(...)
+
+
+
+  // [zdec] should this be in the .cc?
+  //============================================================================
+  /// Return FE representation of the three displacements and their
+  /// derivatives at local coordinate s:
+  ///   0: u_x          6: du_y/dy
+  ///   1: u_y          7: dw/dx
+  ///   2: w            8: dw/dy
+  ///   3: du_x/dx      9: d2w/dx2
+  ///   4: du_x/dy     10: d2w/dxdy
+  ///   5: du_y/dx     11: d2w/dy2
+  //============================================================================
+  Vector<double> FoepplVonKarmanEquations::interpolated_fvk_disp_and_deriv(
+    const Vector<double>& s) const
+  {
+    // The number of in-plane and out-of-plane unknowns
+    const unsigned n_u_displacements = 2;
+    const unsigned n_w_displacements = 1;
+
+    // Find the dimension of the element
+    const unsigned dim = this->dim();
+    // The number of first derivatives is the dimension of the element
+    const unsigned n_deriv = dim;
+    // The number of second derivatives is the triangle number of the
+    // dimension
+    const unsigned n_2deriv = dim * (dim + 1) / 2;
+
+    // Find out how many nodes there are for each field
+    const unsigned n_u_node = nu_node();
+    const unsigned n_w_node = nw_node();
+
+    // Get the vector of nodes used for each field
+    const Vector<unsigned> u_nodes = get_u_node_indices();
+    const Vector<unsigned> w_nodes = get_w_node_indices();
+
+    // Find out how many basis types there are at each node
+    const unsigned n_u_nodal_type = nu_type_at_each_node();
+    const unsigned n_w_nodal_type = nw_type_at_each_node();
+
+    // Find out how many basis types there are internally
+    // NOTE: In general, the in-plane basis may require internal basis/test
+    // functions however, no such basis has been used so far and so this is
+    // not implemented. Comments marked with "[IN-PLANE-INTERNAL]" indicate
+    // locations where changes must be made in the case that internal data is
+    // used for the in-plane unknowns.
+    const unsigned n_u_internal_type = nu_type_internal();
+    const unsigned n_w_internal_type = nw_type_internal();
+
+#ifdef PARANOID
+    // [IN-PLANE-INTERNAL]
+    // This PARANOID block should be deleted if/when internal in-plane
+    // contributions have been implemented
+
+    // Throw an error if the number of internal in-plane basis types is
+    // non-zero
+    if (n_u_internal_type != 0)
+    {
+      throw OomphLibError("The number of internal basis types for u is non-zero\
+ but this functionality is not yet implemented. If you want to implement this\
+ look for comments containing the tag [IN-PLANE-INTERNAL].",
+                          OOMPH_CURRENT_FUNCTION,
+                          OOMPH_EXCEPTION_LOCATION);
+    }
+#endif
+
+    // In-plane local basis & test functions
+    // ------------------------------------------
+    // Local in-plane nodal basis and test functions
+    Shape psi_n_u(n_u_node, n_u_nodal_type);
+    Shape test_n_u(n_u_node, n_u_nodal_type);
+    DShape dpsi_n_udxi(n_u_node, n_u_nodal_type, n_deriv);
+    DShape dtest_n_udxi(n_u_node, n_u_nodal_type, n_deriv);
+    // [IN-PLANE-INTERNAL]
+    // Uncomment this block of Shape/DShape functions to use for the internal
+    // in-plane basis
+    // // Local in-plane internal basis and test functions
+    // Shape psi_i_u(n_u_internal_type);
+    // Shape test_i_u(n_u_internal_type);
+    // DShape dpsi_i_udxi(n_u_internal_type, n_deriv);
+    // DShape dtest_i_udxi(n_u_internal_type, n_deriv);
+
+    // Out-of-plane local basis & test functions
+    // ------------------------------------------
+    // Nodal basis & test functions
+    Shape psi_n_w(n_w_node, n_w_nodal_type);
+    Shape test_n_w(n_w_node, n_w_nodal_type);
+    DShape dpsi_n_wdxi(n_w_node, n_w_nodal_type, n_deriv);
+    DShape dtest_n_wdxi(n_w_node, n_w_nodal_type, n_deriv);
+    DShape d2psi_n_wdxi2(n_w_node, n_w_nodal_type, n_2deriv);
+    DShape d2test_n_wdxi2(n_w_node, n_w_nodal_type, n_2deriv);
+    // Internal basis & test functions
+    Shape psi_i_w(n_w_internal_type);
+    Shape test_i_w(n_w_internal_type);
+    DShape dpsi_i_wdxi(n_w_internal_type, n_deriv);
+    DShape dtest_i_wdxi(n_w_internal_type, n_deriv);
+    DShape d2psi_i_wdxi2(n_w_internal_type, n_2deriv);
+    DShape d2test_i_wdxi2(n_w_internal_type, n_2deriv);
+
+    // Allocate and find global x
+    Vector<double> interp_x(dim, 0.0);
+    interpolated_x(s, interp_x);
+
+    // Call the derivatives of the shape and test functions for the out of
+    // plane unknown
+    d2basis_w_eulerian_foeppl_von_karman(s,
+                                         psi_n_w,
+                                         psi_i_w,
+                                         dpsi_n_wdxi,
+                                         dpsi_i_wdxi,
+                                         d2psi_n_wdxi2,
+                                         d2psi_i_wdxi2);
+
+    // [IN-PLANE-INTERNAL]
+    // This does not include internal basis functions for u. If they are
+    // needed they must be added (as above for w)
+    dbasis_u_eulerian_foeppl_von_karman(s, psi_n_u, dpsi_n_udxi);
+
+
+    //======================= INTERPOLATION =================================
+
+    // Create space for in-plane interpolated unknowns
+    Vector<double> interpolated_u(n_u_displacements, 0.0);
+    Vector<double> interpolated_dudt(n_u_displacements, 0.0);
+    DenseMatrix<double> interpolated_dudxi(n_u_displacements, n_deriv, 0.0);
+    // Create space for out-of-plane interpolated unknowns
+    Vector<double> interpolated_w(n_w_displacements, 0.0);
+    Vector<double> interpolated_dwdt(n_w_displacements, 0.0);
+    DenseMatrix<double> interpolated_dwdxi(n_w_displacements, n_deriv, 0.0);
+    DenseMatrix<double> interpolated_d2wdxi2(n_w_displacements, n_2deriv, 0.0);
+
+    //---Nodal contribution to the in-plane unknowns--------------------------
+    // Loop over nodes used by in-plane fields
+    for (unsigned j_node = 0; j_node < n_u_node; j_node++)
+    {
+      // Get the j-th node used by in-plane fields
+      unsigned j_node_local = u_nodes[j_node];
+
+      // By default, we have no history values (no damping)
+      unsigned n_time = 0;
+      // Turn on damping if this field requires it AND we are not doing a
+      // steady solve
+      TimeStepper* timestepper_pt =
+        this->node_pt(j_node_local)->time_stepper_pt();
+      bool damping = u_is_damped() && !(timestepper_pt->is_steady());
+      if (damping)
+      {
+        n_time = timestepper_pt->ntstorage();
+      }
+
+      // Loop over types
+      for (unsigned k_type = 0; k_type < n_u_nodal_type; k_type++)
+      {
+        // Loop over in-plane unknowns
+        for (unsigned alpha = 0; alpha < n_u_displacements; alpha++)
+        {
+          // --- Time derivative ---
+          double nodal_dudt_value = 0.0;
+          // Loop over the history values (if damping, then n_time>0) and
+          // add history contribution to nodal contribution to time derivative
+          for (unsigned t_time = 0; t_time < n_time; t_time++)
+          {
+            nodal_dudt_value += get_u_alpha_value_at_node_of_type(
+                                  t_time, alpha, j_node_local, k_type) *
+                                timestepper_pt->weight(1, t_time);
+          }
+          interpolated_dudt[alpha] +=
+            nodal_dudt_value * psi_n_u(j_node, k_type);
+
+          // Get the nodal value of type k
+          double u_value =
+            get_u_alpha_value_at_node_of_type(alpha, j_node_local, k_type);
+
+          // --- Displacement ---
+          // Add nodal contribution of type k to the interpolated displacement
+          interpolated_u[alpha] += u_value * psi_n_u(j_node, k_type);
+
+          // --- First derivatives ---
+          for (unsigned l_deriv = 0; l_deriv < n_deriv; l_deriv++)
+          {
+            // Add the nodal contribution of type k to the derivative of the
+            // displacement
+            interpolated_dudxi(alpha, l_deriv) +=
+              u_value * dpsi_n_udxi(j_node, k_type, l_deriv);
+          }
+
+          // --- No second derivatives for in-plane ---
+
+        } // End of loop over the index of u -- alpha
+      } // End of loop over the types -- k_type
+    } // End of loop over the nodes -- j_node
+
+
+    //---Internal contribution to the in-plane
+    // unknowns-------------------------
+    // [IN-PLANE-INTERNAL]
+    // Internal contributions to in-plane interpolation not written
+
+
+    //---Nodal contribution to the out-of-plane
+    // unknowns------------------------
+    for (unsigned j_node = 0; j_node < n_w_node; j_node++)
+    {
+      // Get the j-th node used by in-plane fields
+      unsigned j_node_local = w_nodes[j_node];
+
+      // By default, we have no history values (no damping)
+      unsigned n_time = 0;
+      // Turn on damping if this field requires it AND we are not doing a
+      // steady solve
+      TimeStepper* timestepper_pt =
+        this->node_pt(j_node_local)->time_stepper_pt();
+      bool damping = w_is_damped() && !(timestepper_pt->is_steady());
+      if (damping)
+      {
+        n_time = timestepper_pt->ntstorage();
+      }
+
+      // Loop over types
+      for (unsigned k_type = 0; k_type < n_w_nodal_type; k_type++)
+      {
+        // --- Time derivative ---
+        double nodal_dwdt_value = 0.0;
+        // Loop over the history values (if damping, then n_time>0) and
+        // add history contribution to nodal contribution to time derivative
+        for (unsigned t_time = 0; t_time < n_time; t_time++)
+        {
+          nodal_dwdt_value +=
+            get_w_value_at_node_of_type(t_time, j_node_local, k_type) *
+            timestepper_pt->weight(1, t_time);
+        }
+        interpolated_dwdt[0] += nodal_dwdt_value * psi_n_w(j_node, k_type);
+
+        // Get the nodal value of type k
+        double w_value = get_w_value_at_node_of_type(j_node_local, k_type);
+
+        // --- Displacement ---
+        // Add nodal contribution of type k to the interpolated displacement
+        interpolated_w[0] += w_value * psi_n_w(j_node, k_type);
+
+        // --- First derivatives ---
+        for (unsigned l_deriv = 0; l_deriv < n_deriv; l_deriv++)
+        {
+          // Add the nodal contribution of type k to the derivative of the
+          // displacement
+          interpolated_dwdxi(0, l_deriv) +=
+            w_value * dpsi_n_wdxi(j_node, k_type, l_deriv);
+        }
+
+        // --- Second derivatives ---
+        for (unsigned l_2deriv = 0; l_2deriv < n_2deriv; l_2deriv++)
+        {
+          // Add the nodal contribution of type k to the derivative of the
+          // displacement
+          interpolated_d2wdxi2(0, l_2deriv) +=
+            w_value * d2psi_n_wdxi2(j_node, k_type, l_2deriv);
+        }
+
+      } // End of loop over the types -- k_type
+    } // End of loop over the nodes -- j_node
+
+    //---Internal contribution to the out-of-plane field----------------------
+    // --- Set up damping ---
+    // By default, we have no history values (no damping)
+    unsigned n_time = 0;
+    // Turn on damping if this field requires it AND we are not doing a steady
+    // solve
+    TimeStepper* timestepper_pt = this->w_internal_data_pt()->time_stepper_pt();
+    bool damping = w_is_damped() && !(timestepper_pt->is_steady());
+    if (damping)
+    {
+      n_time = timestepper_pt->ntstorage();
+    }
+    // Loop over the internal data types
+    for (unsigned k_type = 0; k_type < n_w_internal_type; k_type++)
+    {
+      // --- Time derivative ---
+      double nodal_dwdt_value = 0.0;
+      // Loop over the history values (if damping, then n_time>0) and
+      // add history contribution to nodal contribution to time derivative
+      for (unsigned t_time = 0; t_time < n_time; t_time++)
+      {
+        nodal_dwdt_value += get_w_internal_value_of_type(t_time, k_type) *
+                            timestepper_pt->weight(1, t_time);
+      }
+      interpolated_dwdt[0] += nodal_dwdt_value * psi_i_w(k_type);
+
+      // Get the nodal value of type k
+      double w_value = get_w_internal_value_of_type(k_type);
+
+      // --- Displacement ---
+      // Add nodal contribution of type k to the interpolated displacement
+      interpolated_w[0] += w_value * psi_i_w(k_type);
+
+      // --- First derivatives ---
+      for (unsigned l_deriv = 0; l_deriv < n_deriv; l_deriv++)
+      {
+        // Add the nodal contribution of type k to the derivative of the
+        // displacement
+        interpolated_dwdxi(0, l_deriv) +=
+          w_value * dpsi_i_wdxi(k_type, l_deriv);
+      }
+
+      // --- Second derivatives ---
+      for (unsigned l_2deriv = 0; l_2deriv < n_2deriv; l_2deriv++)
+      {
+        // Add the nodal contribution of type k to the derivative of the
+        // displacement
+        interpolated_d2wdxi2(0, l_2deriv) +=
+          w_value * d2psi_i_wdxi2(k_type, l_2deriv);
+      }
+
+    } // End of loop over internal types -- k_type
+
+    //====================== END OF INTERPOLATION ============================
+
+    // Copy our interpolated fields into f in the order we want and return it.
+    Vector<double> interpolated_vals(12, 0.0);
+    interpolated_vals[0] = interpolated_u[0]; // ux
+    interpolated_vals[1] = interpolated_u[1]; // uy
+    interpolated_vals[2] = interpolated_w[0]; // w
+    interpolated_vals[3] = interpolated_dudxi(0, 0); // duxdx
+    interpolated_vals[4] = interpolated_dudxi(0, 1); // duxdy
+    interpolated_vals[5] = interpolated_dudxi(1, 0); // duydx
+    interpolated_vals[6] = interpolated_dudxi(1, 1); // duydy
+    interpolated_vals[7] = interpolated_dwdxi(0, 0); // dwdx
+    interpolated_vals[8] = interpolated_dwdxi(0, 1); // dwdy
+    interpolated_vals[9] = interpolated_d2wdxi2(0, 0); // d2wdx2
+    interpolated_vals[10] = interpolated_d2wdxi2(0, 1); // d2wdxdy
+    interpolated_vals[11] = interpolated_d2wdxi2(0, 2); // d2wdy2
+    return (interpolated_vals);
   }
+  // End of interpolated_fvk_disp_and_deriv(...)
+
 } // namespace oomph

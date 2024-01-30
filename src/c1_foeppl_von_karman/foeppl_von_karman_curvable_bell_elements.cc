@@ -62,26 +62,7 @@ namespace oomph
   const unsigned FoepplVonKarmanC1CurvableBellElement<4>::Initial_Nvalue[10] = {
     8, 8, 8, 2, 2, 2, 2, 2, 2, 2};
 
-  //=======================================================================
-  /// Shape function for specific TElement<DIM,NNODE,BOUNDARY_ORDER>
-  //=======================================================================
-  template<unsigned NNODE>
-  void FoepplVonKarmanC1CurvableBellElement<NNODE>::shape_u(
-    const Vector<double>& s, Shape& psi) const
-  {
-    // Use the base TElement version of shape
-    TElement<2, NNODE>::shape(s, psi);
-  }
-  //=======================================================================
-  /// Derivatives of shape functions for specific TElement<2,2,BOUNDARY_ORDER>
-  //=======================================================================
-  template<unsigned NNODE>
-  void FoepplVonKarmanC1CurvableBellElement<NNODE>::dshape_u_local(
-    const Vector<double>& s, Shape& psi, DShape& dpsids) const
-  {
-    // Use the base TElement version of dshape_local
-    TElement<2, NNODE>::dshape_local(s, psi, dpsids);
-  }
+
   //====================================================================
   // Force build of templates
   //====================================================================
@@ -90,4 +71,5 @@ namespace oomph
   template class FoepplVonKarmanC1CurvableBellElement<3>;
 
   template class FoepplVonKarmanC1CurvableBellElement<4>;
+
 } // namespace oomph

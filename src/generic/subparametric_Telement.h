@@ -29,8 +29,8 @@
 // LIC//====================================================================
 
 // oomph-lib headers
-#include "../generic/shape.h"
-#include "../generic/Telements.h"
+#include "shape.h"
+#include "Telements.h"
 #include "c1_curved_elements.h"
 #include "my_geom_object.h"
 

@@ -1,5 +1,6 @@
 # A few file definitions
 #-----------------------
+
 # Define the sources
 sources =  \
  foeppl_von_karman_equations.cc \
@@ -7,7 +8,6 @@ sources =  \
 
 # Define the headers
 headers =  \
- foeppl_von_karman.h \
  foeppl_von_karman_equations.h \
  foeppl_von_karman_curvable_bell_elements.h
 
