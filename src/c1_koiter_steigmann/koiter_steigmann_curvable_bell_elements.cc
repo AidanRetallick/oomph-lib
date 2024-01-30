@@ -3,6 +3,17 @@
 
 namespace oomph
 {
+  //=============================================================================
+  /// Set the number of fields
+  //=============================================================================
+  const unsigned KoiterSteigmannC1CurvableBellElement::Nfield = 3;
+
+
+  //=============================================================================
+  /// Set the interpolation of each field
+  //=============================================================================
+  const std::vector<bool> KoiterSteigmannC1CurvableBellElement::
+  Field_is_bell_interpolated = {true, true, true};
 
   //======================================================================
   /// Set the data for the number of Variables at each node
@@ -13,11 +24,7 @@ namespace oomph
   //          template<unsigned DIM_, unsigned NNODE_1D_>
   //          class PLATE_EQUATIONS>
   const unsigned
-    LargeDisplacementPlateC1CurvedBellElement<DIM,
-                                              NNODE_1D,
-                                              BOUNDARY_ORDER,
-                                              PLATE_EQUATIONS>::Initial_Nvalue =
-      18;
+    KoiterSteigmannC1CurvableBellElement::Initial_Nvalue = 18;
 
 
   //====================================================================

@@ -1,14 +1,14 @@
-// Header file for the Biharmonic Bell elements
-#ifndef OOMPH_C1_KOITER_STEIGMANN_ELEMENTS_HEADER
-#define OOMPH_C1_KOITER_STEIGMANN_ELEMENTS_HEADER
+// Header file for the Koiter Steigmann Equations class
+#ifndef OOMPH_C1_KOITER_STEIGMANN_EQUATIONS_HEADER
+#define OOMPH_C1_KOITER_STEIGMANN_EQUATIONS_HEADER
 
-
+// std headers
 #include <sstream>
 
-// OOMPH-LIB headers
-#include "../generic/nodes.h"
-#include "../generic/oomph_utilities.h"
-#include "../generic/Telements.h"
+// oomph-lib headers
+#include "src/generic/nodes.h"
+#include "src/generic/oomph_utilities.h"
+#include "src/generic/Telements.h"
 
 namespace oomph
 {
@@ -26,6 +26,15 @@ namespace oomph
   public:
     //----------------------------------------------------------------------
     // Types defined for class
+
+    /// A pointer to a scalar function of the position. Can be used for
+    /// out-of-plane forcing, swelling, isotropic-prestrain, etc.
+    typedef void (*ScalarFctPt)(const Vector<double>& x, double& f);
+
+    /// A pointer to a vector function of the position. Can be used for
+    /// in-of-plane forcing, anisotropic-prestrain, etc.
+    typedef void (*VectorFctPt)(const Vector<double>& x, Vector<double>& f);
+
     /// \short Function pointer to pressure function fct(x,f(x)) --
     /// x is a Vector!
     // typedef void (*PressureFctPt)(const Vector<double>& x, double& f);
@@ -84,137 +93,25 @@ namespace oomph
                                              const Vector<double>& u_exact,
                                              Vector<double>& error,
                                              Vector<double>& norm);
+
     // End of types defined for class
     //----------------------------------------------------------------------
 
+
     //--------------------------------------------------------------------------
-    // Pure virtual interfaces which must be implemented when geometry and bases
-    // are added in the derived class
-
-    /// (pure virtual) interface to return the number of nodes used to
-    /// interpolate each displacement field
-    virtual unsigned nu_node() const = 0;
-
-    /// (pure virtual) interface to get the local indices of the nodes used by u
-    virtual Vector<unsigned> get_u_node_indices() const = 0;
-
-    /// (pure virtual) interface to get the number of basis types for u at node
-    /// j
-    virtual unsigned nu_type_at_each_node() const = 0;
-
-    /// (pure virtual) interface to retrieve the value of u_alpha at node j of
-    /// type k
-    virtual double get_u_alpha_value_at_node_of_type(
-      const unsigned& alpha,
-      const unsigned& j_node,
-      const unsigned& k_type) const = 0;
-
-    /// (pure virtual) interface to retrieve the t-th history value value of
-    /// u_alpha at node j of type k
-    virtual double get_u_alpha_value_at_node_of_type(
-      const unsigned& t_time,
-      const unsigned& alpha,
-      const unsigned& j_node,
-      const unsigned& k_type) const = 0;
-
-    /// (pure virtual) interface to get the pointer to the internal data used to
-    /// interpolate u (NOTE: assumes each u field has exactly one internal data)
-    virtual Vector<Data*> u_internal_data_pts() const = 0;
-
-    /// (pure virtual) interface to get the number of internal types for the u
-    /// fields
-    virtual unsigned nu_type_internal() const = 0;
-
-    /// (pure virtual) interface to retrieve the value of u_alpha of internal
-    /// type k
-    virtual double get_u_alpha_internal_value_of_type(
-      const unsigned& alpha,
-      const unsigned& k_type) const = 0;
-
-    /// (pure virtual) interface to retrieve the t-th history value of u_alpha
-    /// of internal type k
-    virtual double get_u_alpha_internal_value_of_type(
-      const unsigned& time,
-      const unsigned& alpha,
-      const unsigned& k_type) const = 0;
-
-
-  protected:
-
-    /// (pure virtual) Out-of-plane basis functions at local coordinate s
-    virtual void basis_u_koiter_steigmann(const Vector<double>& s,
-                                           Shape& psi_n,
-                                           Shape& psi_i) const = 0;
-
-    /// (pure virtual) Out-of-plane basis functions and derivs w.r.t. global
-    /// coords at local coordinate s; return det(Jacobian of mapping)
-    virtual double d2basis_u_eulerian_koiter_steigmann(
-      const Vector<double>& s,
-      Shape& psi_n,
-      Shape& psi_i,
-      DShape& dpsi_n_dx,
-      DShape& dpsi_i_dx,
-      DShape& d2psi_n_dx2,
-      DShape& d2psi_i_dx2) const = 0;
-
-    /// (pure virtual) Out-of-plane basis/test functions at local coordinate s
-    virtual void basis_and_test_u_koiter_steigmann(
-      const Vector<double>& s,
-      Shape& psi_n,
-      Shape& psi_i,
-      Shape& test_n,
-      Shape& test_i) const = 0;
-
-    /// (pure virtual) Out-of-plane basis/test functions and first derivs w.r.t.
-    /// to global coords at local coordinate s; return det(Jacobian of mapping)
-    virtual double dbasis_and_dtest_u_eulerian_koiter_steigmann(
-      const Vector<double>& s,
-      Shape& psi_n,
-      Shape& psi_i,
-      DShape& dpsi_n_dx,
-      DShape& dpsi_i_dx,
-      Shape& test_n,
-      Shape& test_i,
-      DShape& dtest_n_dx,
-      DShape& dtest_i_dx) const = 0;
-
-    /// (pure virtual) Out-of-plane basis/test functions and first/second derivs
-    /// w.r.t. to global coords at local coordinate s;
-    /// return det(Jacobian of mapping)
-    virtual double d2basis_and_d2test_u_koiter_steigmann(
-      const Vector<double>& s,
-      Shape& psi_n,
-      Shape& psi_i,
-      DShape& dpsi_n_dx,
-      DShape& dpsi_i_dx,
-      DShape& d2psi_n_dx2,
-      DShape& d2psi_i_dx2,
-      Shape& test_n,
-      Shape& test_i,
-      DShape& dtest_n_dx,
-      DShape& dtest_i_dx,
-      DShape& d2test_n_dx2,
-      DShape& d2test_i_dx2) const = 0;
-
-    // End of pure virtual interface functions
-    //----------------------------------------------------------------------------
-
+    // Class construction
 
     /// Constructor
     KoiterSteigmannEquations()
-      : Pressure_fct_pt(0),
+      : Use_finite_difference_jacobian(false),
+	Pressure_fct_pt(0),
         D_pressure_dr_fct_pt(0),
         D_pressure_dn_fct_pt(0),
         D_pressure_d_grad_u_fct_pt(0),
         Stress_fct_pt(0),
         D_stress_fct_pt(0),
         Error_metric_fct_pt(0),
-        Multiple_error_metric_fct_pt(0),
-        Number_of_internal_dofs(0),
-        Number_of_internal_dof_types(0),
-        Association_matrix_pt(0),
-        Use_finite_difference_jacobian(false),
-        Association_matrix_is_cached(false)
+        Multiple_error_metric_fct_pt(0)
     {
       // Poisson ratio is 0.5 (incompressible) by default.
       Nu_pt = &Default_Nu_Value;
@@ -243,28 +140,9 @@ namespace oomph
       BrokenCopy::broken_assign("KoiterSteigmannEquations");
     }
 
-    /// Enable Finite difference Jacobian
-    void enable_finite_difference_jacobian()
-    {
-      Use_finite_difference_jacobian = true;
-    }
 
-    /// Disable Finite difference Jacobian
-    void disable_finite_difference_jacobian()
-    {
-      Use_finite_difference_jacobian = false;
-    }
-
-    /// Return the index at which the ith displacement kth type (unknown) value
-    /// is stored. In derived multi-physics elements, this function should be
-    /// overloaded to reflect the chosen storage scheme. Note that these
-    /// equations require that the unknown is always stored at the same index at
-    /// each node.
-    inline virtual unsigned u_index_koiter_model(const unsigned& i,
-						 const unsigned& k) const
-    {
-      return i * (this->nu_type_at_each_node()) + k;
-    }
+    //----------------------------------------------------------------------
+    // Output and documentation
 
     /// Output with default number of plot points
     void output(std::ostream& outfile)
@@ -309,17 +187,22 @@ namespace oomph
     }
 
 
-    /// Get error against and norm of exact solution
-    void compute_error(std::ostream& outfile,
-                       FiniteElement::SteadyExactSolutionFctPt exact_soln_pt,
-                       double& error,
-                       double& norm);
+    //----------------------------------------------------------------------
+    // Error and norms
 
     /// Get error against and norm of exact solution
-    void compute_error(std::ostream& outfile,
-                       FiniteElement::SteadyExactSolutionFctPt exact_soln_pt,
-                       Vector<double>& error,
-                       Vector<double>& norm);
+    void compute_error(
+      std::ostream& outfile,
+      FiniteElement::SteadyExactSolutionFctPt exact_soln_pt,
+      double& error,
+      double& norm);
+
+    /// Get error against and norm of exact solution
+    void compute_error(
+      std::ostream& outfile,
+      FiniteElement::SteadyExactSolutionFctPt exact_soln_pt,
+      Vector<double>& error,
+      Vector<double>& norm);
 
     /// Dummy, time dependent error checker
     inline void compute_error(
@@ -335,146 +218,9 @@ namespace oomph
         OOMPH_EXCEPTION_LOCATION);
     }
 
-    // Get pointer to association matrix
-    inline DenseMatrix<double>* get_association_matrix_pt() const
-    {
-      return Association_matrix_pt;
-    }
 
-    /// Access function: Pointer to pressure function
-    inline PressureVectorFctPt& pressure_fct_pt()
-    {
-      return Pressure_fct_pt;
-    }
-
-    /// Access function: Pointer to pressure function
-    inline DPressureVectorFctPt& d_pressure_dn_fct_pt()
-    {
-      return D_pressure_dn_fct_pt;
-    }
-
-    /// Access function: Pointer to pressure function
-    inline DPressureVectorFctPt& d_pressure_dr_fct_pt()
-    {
-      return D_pressure_dr_fct_pt;
-    }
-
-    /// Access function: Pointer to pressure function
-    inline DPressureVectorDMatrixFctPt& d_pressure_d_grad_u_fct_pt()
-    {
-      return D_pressure_d_grad_u_fct_pt;
-    }
-
-    /// Access function: Pointer to Stress function
-    inline StressFctPt& stress_fct_pt()
-    {
-      return Stress_fct_pt;
-    }
-
-    /// Access function: Pointer to Stress function
-    inline DStressFctPt& d_stress_fct_pt()
-    {
-      return D_stress_fct_pt;
-    }
-
-    /// Access function: Pointer to error metric function
-    inline ErrorMetricFctPt& error_metric_fct_pt()
-    {
-      return Error_metric_fct_pt;
-    }
-
-    /// Access function: Pointer to multiple error metric function
-    inline MultipleErrorMetricFctPt& multiple_error_metric_fct_pt()
-    {
-      return Multiple_error_metric_fct_pt;
-    }
-
-    /// Access function: Pointer to pressure function. Const version
-    inline PressureVectorFctPt pressure_fct_pt() const
-    {
-      return Pressure_fct_pt;
-    }
-
-    /// Access function: Pointer to pressure function
-    inline DPressureVectorFctPt d_pressure_dn_fct_pt() const
-    {
-      return D_pressure_dn_fct_pt;
-    }
-
-    /// Access function: Pointer to pressure function
-    inline DPressureVectorFctPt d_pressure_dr_fct_pt() const
-    {
-      return D_pressure_dr_fct_pt;
-    }
-
-    /// Access function: Pointer to pressure function
-    inline DPressureVectorDMatrixFctPt d_pressure_d_grad_u_fct_pt() const
-    {
-      return D_pressure_d_grad_u_fct_pt;
-    }
-
-    /// Access function: Pointer to stress function. Const version
-    inline StressFctPt stress_fct_pt() const
-    {
-      return Stress_fct_pt;
-    }
-
-    /// Access function: Pointer to stress function. Const version
-    inline DStressFctPt d_stress_fct_pt() const
-    {
-      return D_stress_fct_pt;
-    }
-
-    /// Access function: Pointer to error metric function function
-    inline ErrorMetricFctPt error_metric_fct_pt() const
-    {
-      return Error_metric_fct_pt;
-    }
-
-    /// Access function: Pointer to multiple error metric function
-    inline MultipleErrorMetricFctPt multiple_error_metric_fct_pt() const
-    {
-      return Multiple_error_metric_fct_pt;
-    }
-
-    /// Access function to the Poisson ratio.
-    inline const double*& nu_pt()
-    {
-      return Nu_pt;
-    }
-
-    /// Access function to the Poisson ratio.
-    inline const double*& thickness_pt()
-    {
-      return Thickness_pt;
-    }
-
-    /// Access function to the Poisson ratio (const version)
-    inline const double& get_nu() const
-    {
-      return *Nu_pt;
-    }
-
-    /// Access function to the Poisson ratio (const version)
-    inline const double& get_thickness() const
-    {
-      return *Thickness_pt;
-    }
-
-    // Get the kth dof type at internal point l
-    virtual double get_u_bubble_dof(const unsigned& l,
-                                    const unsigned& k) const = 0;
-
-    // Get the kth equation at internal point l
-    virtual int local_u_bubble_equation(const unsigned& l,
-                                        const unsigned& k) const = 0;
-
-    // Precompute the association matrix, pure virtual
-    virtual void precompute_association_matrix(DenseMatrix<double>& m) = 0;
-    // Get the number of basis functions, pure virtual
-    virtual double n_basis_functions() = 0;
-    // Get the number of basic basis functions, pure virtual
-    virtual double n_basic_basis_functions() = 0;
+    //----------------------------------------------------------------------
+    // Dependent variables
 
     // Return the determinant of the metric tensor
     inline double two_by_two_determinant(const DenseMatrix<double>& g_tensor)
@@ -483,228 +229,83 @@ namespace oomph
       return g_tensor(0, 0) * g_tensor(1, 1) - g_tensor(0, 1) * g_tensor(1, 0);
     }
 
-    /// Get pressure term at (Eulerian) position x. This function is
-    /// virtual to allow overloading in multi-physics problems where
-    /// the strength of the pressure function might be determined by
-    /// another system of equations.
-    inline virtual void get_pressure_biharmonic(const unsigned& ipt,
-                                        const Vector<double>& x,
-                                        const Vector<double>& u,
-                                        const DenseMatrix<double>& grad_u,
-                                        const Vector<double>& n,
-                                        Vector<double>& pressure) const
+    /// Return FE representation of unknown values u(s) at local coordinate s
+    inline void interpolated_koiter_steigmann_disp(
+      const Vector<double>& s, Vector<Vector<double>>& interpolated_u) const
     {
-      // If no pressure function has been set, return zero
-      if (Pressure_fct_pt == 0)
-      {
-        pressure[0] = 0.0;
-        pressure[1] = 0.0;
-        pressure[2] = 0.0;
-      }
-      else
-      {
-        // Zero the pressure (as a precaution)
-        pressure[0] = 0.0;
-        pressure[1] = 0.0;
-        pressure[2] = 0.0;
-        // Get pressure strength
-        (*Pressure_fct_pt)(x, u, grad_u, n, pressure);
-      }
-    }
+      // Number of displacement fields we are interpolating
+      const unsigned n_displacements = this->Number_of_displacements;
 
-    /// Get pressure term at (Eulerian) position x. This function is
-    /// virtual to allow overloading in multi-physics problems where
-    /// the strength of the pressure function might be determined by
-    /// another system of equations.
-    inline virtual void get_d_pressure_biharmonic_dn(
-      const unsigned& ipt,
-      const Vector<double>& x,
-      const Vector<double>& u,
-      const DenseMatrix<double>& grad_u,
-      const Vector<double>& n,
-      DenseMatrix<double>& d_pressure_dn) const
-    {
-      // If no pressure function has been set, return zero
-      if (D_pressure_dn_fct_pt == 0)
+      // Dimension of the plate domain
+      const unsigned dim = this->dim();
+      // The number of first derivatives is the dimension of the element
+      const unsigned n_deriv = dim;
+      // The number of second derivatives is the triangle number of the
+      // dimension
+      const unsigned n_2deriv = dim * (dim + 1) / 2;
+
+      // Find out how many nodes are used to interpolate each displacement field
+      const unsigned n_u_node = nu_node();
+
+      // Vector of nodal indices used in interpolating displacement fields
+      const Vector<unsigned> u_nodes = get_u_node_indices();
+
+      // Find number of position dofs at each node per displacement field
+      const unsigned n_u_nodal_type = nu_type_at_each_node();
+
+      // Find the number of internal dofs per displacement field
+      const unsigned n_u_internal_type = nu_type_internal();
+
+      // [zdec] REMOVE TEST FUNCTIONS
+      // Local c1-shape funtion
+      Shape psi_n(n_u_node, n_u_nodal_type);
+      Shape psi_i(n_u_internal_type);
+      DShape dpsi_n_dxi(n_u_node, n_u_nodal_type, n_deriv);
+      DShape dpsi_i_dxi(n_u_internal_type, n_deriv);
+      DShape d2psi_n_dxi2(n_u_node, n_u_nodal_type, n_2deriv);
+      DShape d2psi_i_dxi2(n_u_internal_type, n_2deriv);
+
+      // Find values of c1-shape function
+      d2basis_u_eulerian_koiter_steigmann(s,
+					  psi_n,
+					  psi_i,
+					  dpsi_n_dxi,
+					  dpsi_i_dxi,
+					  d2psi_n_dxi2,
+					  d2psi_i_dxi2);
+
+      // Interpolated unknown
+      // Loop over displacements
+      for (unsigned i_field = 0; i_field < n_displacements; i_field++)
       {
-        for (unsigned i = 0; i < Number_of_displacements; ++i)
+        // Loop over nodes
+        for (unsigned j_node = 0; j_node < n_u_node; j_node++)
         {
-          for (unsigned j = 0; j < Number_of_displacements; ++j)
+          // Loop over hermite dofs
+          for (unsigned k_type = 0; k_type < n_u_nodal_type; k_type++)
           {
-            d_pressure_dn(i, j) = 0.0;
+            // Get the kth nodal value at node j for displacement i
+            double u_value =
+	      get_u_i_value_at_node_of_type(i_field, j_node, k_type);
+            interpolated_u[i_field][0] += u_value * psi_n(j_node, k_type);
+            interpolated_u[i_field][1] += u_value * dpsi_n_dxi(j_node, k_type, 0);
+            interpolated_u[i_field][2] += u_value * dpsi_n_dxi(j_node, k_type, 1);
+            interpolated_u[i_field][3] += u_value * d2psi_n_dxi2(j_node, k_type, 0);
+            interpolated_u[i_field][4] += u_value * d2psi_n_dxi2(j_node, k_type, 1);
+            interpolated_u[i_field][5] += u_value * d2psi_n_dxi2(j_node, k_type, 2);
           }
         }
-      }
-      else
-      {
-        // Zero the pressure (as a precaution)
-        for (unsigned i = 0; i < Number_of_displacements; ++i)
-        {
-          for (unsigned j = 0; j < Number_of_displacements; ++j)
-          {
-            d_pressure_dn(i, j) = 0.0;
-          }
-        }
-        // Get d_p_dn
-        (*D_pressure_dn_fct_pt)(x, u, grad_u, n, d_pressure_dn);
-      }
-    }
-
-    /// Get pressure term at (Eulerian) position x. This function is
-    /// virtual to allow overloading in multi-physics problems where
-    /// the strength of the pressure function might be determined by
-    /// another system of equations.
-    inline virtual void get_d_pressure_biharmonic_dr(
-      const unsigned& ipt,
-      const Vector<double>& x,
-      const Vector<double>& u,
-      const DenseMatrix<double>& grad_u,
-      const Vector<double>& n,
-      DenseMatrix<double>& d_pressure_dr) const
-    {
-      // If no pressure function has been set, return zero
-      if (D_pressure_dr_fct_pt == 0)
-      {
-        for (unsigned i = 0; i < Number_of_displacements; ++i)
-        {
-          for (unsigned j = 0; j < Number_of_displacements; ++j)
-          {
-            d_pressure_dr(i, j) = 0.0;
-          }
-        }
-      }
-      else
-      {
-        // Zero the pressure (as a precaution)
-        for (unsigned i = 0; i < Number_of_displacements; ++i)
-        {
-          for (unsigned j = 0; j < Number_of_displacements; ++j)
-          {
-            d_pressure_dr(i, j) = 0.0;
-          }
-        }
-        // Get d_p_dn
-        (*D_pressure_dr_fct_pt)(x, u, grad_u, n, d_pressure_dr);
-      }
-    }
-
-    /// Get pressure term at (Eulerian) position x. This function is
-    /// virtual to allow overloading in multi-physics problems where
-    /// the strength of the pressure function might be determined by
-    /// another system of equations.
-    inline void get_d_pressure_biharmonic_d_grad_u(
-      const unsigned& ipt,
-      const Vector<double>& x,
-      const Vector<double>& u,
-      const DenseMatrix<double>& grad_u,
-      const Vector<double>& n,
-      RankThreeTensor<double>& d_pressure_d_grad_u) const
-    {
-      // If no pressure function has been set, return zero
-      if (D_pressure_dn_fct_pt == 0)
-      {
-        for (unsigned i = 0; i < Number_of_displacements; ++i)
-        {
-          for (unsigned j = 0; j < Number_of_displacements; ++j)
-          {
-            for (unsigned alpha = 0; alpha < 2; ++alpha)
-            {
-              d_pressure_d_grad_u(i, j, alpha) = 0.0;
-            }
-          }
-        }
-      }
-      else
-      {
-        // Zero the pressure (as a precaution)
-        for (unsigned i = 0; i < Number_of_displacements; ++i)
-        {
-          for (unsigned j = 0; j < Number_of_displacements; ++j)
-          {
-            for (unsigned alpha = 0; alpha < 2; ++alpha)
-            {
-              d_pressure_d_grad_u(i, j, alpha) = 0.0;
-            }
-          }
-        }
-        // Get d_p_dn
-        (*D_pressure_d_grad_u_fct_pt)(x, u, grad_u, n, d_pressure_d_grad_u);
-      }
-    }
-
-    /// Add the element's contribution to its residual vector (wrapper)
-    void fill_in_contribution_to_residuals(Vector<double>& residuals)
-    {
-      DenseMatrix<double> conversion_matrix(
-        n_basis_functions(), n_basic_basis_functions(), 0.0);
-      // Precompute if not cached
-      if (!Association_matrix_is_cached)
-      {
-        // Precompute the association matrix
-        this->precompute_association_matrix(conversion_matrix);
-        this->Association_matrix_pt = &conversion_matrix;
-      }
-
-      // Call the generic residuals function with flag set to 0
-      // using a dummy matrix argument
-      fill_in_generic_residual_contribution_biharmonic(
-        residuals, GeneralisedElement::Dummy_matrix, 0);
-
-      // Reset to zero
-      if (!Association_matrix_is_cached)
-      {
-        this->Association_matrix_pt = 0;
-      }
-    }
-
-
-    /// Add the element's contribution to its residual vector and
-    /// element Jacobian matrix (wrapper)
-    void fill_in_contribution_to_jacobian(Vector<double>& residuals,
-                                          DenseMatrix<double>& jacobian)
-    {
-      // Precompute the association matrix
-      DenseMatrix<double> conversion_matrix(
-        n_basis_functions(), n_basic_basis_functions(), 0.0);
-      this->precompute_association_matrix(conversion_matrix);
-      this->Association_matrix_pt = &conversion_matrix;
-      Association_matrix_is_cached = true;
-
-      // Call the generic routine with the flag set to 1
-      if (!Use_finite_difference_jacobian)
-      {
-        fill_in_generic_residual_contribution_biharmonic(
-          residuals, jacobian, 1);
-      }
-      else
-      {
-        // Otherwise call the default
-        FiniteElement::fill_in_contribution_to_jacobian(residuals, jacobian);
-      }
-
-      // Reset to zero
-      this->Association_matrix_pt = 0;
-      Association_matrix_is_cached = false;
-    }
-
-    /// Add the element's contribution to its residual vector and
-    /// element Jacobian matrix (wrapper)
-    void fill_in_contribution_to_jacobian_and_mass_matrix(
-      Vector<double>& residuals,
-      DenseMatrix<double>& jacobian,
-      DenseMatrix<double>& mass_matrix)
-    {
-      // Call fill in Jacobian
-      fill_in_contribution_to_jacobian(residuals, jacobian);
-      // There is no mass matrix: we will just want J w = 0
-
-      // -- COPIED FROM DISPLACMENT FVK EQUATIONS --
-      // Dummy diagonal (won't result in global unit matrix but
-      // doesn't matter for zero eigenvalue/eigenvector
-      unsigned ndof = mass_matrix.nrow();
-      for (unsigned i = 0; i < ndof; i++)
-      {
-        mass_matrix(i, i) += 1.0;
+        // Loop over internal dofs
+	for (unsigned k_type = 0; k_type < n_u_internal_type; k_type++)
+	{
+	  double u_value = get_u_i_internal_value_of_type(i_field, k_type);
+	  interpolated_u[i_field][0] += u_value * psi_i(k_type);
+	  interpolated_u[i_field][1] += u_value * dpsi_i_dxi(k_type, 0);
+	  interpolated_u[i_field][2] += u_value * dpsi_i_dxi(k_type, 1);
+	  interpolated_u[i_field][3] += u_value * d2psi_i_dxi2(k_type, 0);
+	  interpolated_u[i_field][4] += u_value * d2psi_i_dxi2(k_type, 1);
+	  interpolated_u[i_field][5] += u_value * d2psi_i_dxi2(k_type, 2);
+	}
       }
     }
 
@@ -775,7 +376,6 @@ namespace oomph
       }
     }
 
-
     // Get the (Green Lagrange) strain tensor
     // \Gamma_{\alpha\beta\gamma} = ( E_{\alpha\beta,gamma} +
     // E_{\gamma\alpha,\beta}
@@ -794,8 +394,7 @@ namespace oomph
           stress(alpha, beta) = 0.0;
         }
       }
-
-      // IF not set use Kirchhoff st venant
+      // IF no stress function has been set use Kirchhoff st venant
       if (Stress_fct_pt == 0)
       {
         fill_in_kirchhoff_st_venant_stress(strain, stress);
@@ -889,120 +488,6 @@ difference stress is not yet defined so an error has been thrown.",
       }
     }
 
-
-    /// Return FE representation of unknown values u(s) at local coordinate s
-    inline void interpolated_koiter_steigmann_disp(
-      const Vector<double>& s, Vector<Vector<double>>& interpolated_u) const
-    {
-      // Number of displacement fields we are interpolating
-      const unsigned n_displacements = this->Number_of_displacements;
-
-      // Dimension of the plate domain
-      const unsigned dim = this->dim();
-      // The number of first derivatives is the dimension of the element
-      const unsigned n_deriv = dim;
-      // The number of second derivatives is the triangle number of the
-      // dimension
-      const unsigned n_2deriv = dim * (dim + 1) / 2;
-
-      // Find out how many nodes are used to interpolate each displacement field
-      const unsigned n_u_node = nu_node();
-
-      // Vector of nodal indices used in interpolating displacement fields
-      const Vector<unsigned> u_nodes = get_u_node_indices();
-
-      // Find number of position dofs at each node per displacement field
-      const unsigned n_u_nodal_type = nu_type_at_each_node();
-
-      // Find the number of internal dofs per displacement field
-      const unsigned n_u_internal_type = nu_type_internal();
-
-      // [zdec] REMOVE TEST FUNCTIONS
-      // Local c1-shape funtion
-      Shape psi_n(n_u_node, n_u_nodal_type);
-      Shape psi_i(n_u_internal_type);
-      Shape test_n(n_u_node, n_u_nodal_type);
-      Shape test_i(n_u_internal_type);
-
-      DShape dpsi_n_dxi(n_u_node, n_u_nodal_type, n_deriv);
-      DShape dtest_n_dxi(n_u_node, n_u_nodal_type, n_deriv);
-      DShape dpsi_i_dxi(n_u_internal_type, n_deriv);
-      DShape dtest_i_dxi(n_u_internal_type, n_deriv);
-      DShape d2psi_n_dxi2(n_u_node, n_u_nodal_type, n_2deriv);
-      DShape d2test_n_dxi2(n_u_node, n_u_nodal_type, n_2deriv);
-      DShape d2psi_i_dxi2(n_u_internal_type, n_2deriv);
-      DShape d2test_i_dxi2(n_u_internal_type, n_2deriv);
-
-      // Find values of c1-shape function
-      d2shape_and_d2test_eulerian_biharmonic(s,
-                                             psi_n,
-                                             psi_i,
-                                             dpsi_n_dxi,
-                                             dpsi_i_dxi,
-                                             d2psi_n_dxi2,
-                                             d2psi_i_dxi2,
-                                             test_n,
-                                             test_i,
-                                             dtest_n_dxi,
-                                             dtest_i_dxi,
-                                             d2test_n_dxi2,
-                                             d2test_i_dxi2);
-
-      // Interpolated unknown
-      // Loop over displacements
-      for (unsigned i = 0; i < n_displacements; ++i)
-      {
-        // Loop over nodes
-        for (unsigned l = 0; l < n_u_node; l++)
-        {
-          // Loop over hermite dofs
-          for (unsigned k = 0; k < n_u_nodal_type; k++)
-          {
-            // Get the kth nodal value at node l for displacement i
-            double u_value_ikl =
-              this->raw_nodal_value(l, u_index_koiter_model(k, i));
-            interpolated_u[i][0] += u_value_ikl * psi_n(l, k);
-            interpolated_u[i][1] += u_value_ikl * dpsi_n_dxi(l, k, 0);
-            interpolated_u[i][2] += u_value_ikl * dpsi_n_dxi(l, k, 1);
-            interpolated_u[i][3] += u_value_ikl * d2psi_n_dxi2(l, k, 0);
-            interpolated_u[i][4] += u_value_ikl * d2psi_n_dxi2(l, k, 1);
-            interpolated_u[i][5] += u_value_ikl * d2psi_n_dxi2(l, k, 2);
-          }
-        }
-        // Loop over Bubble dofs
-        for (unsigned l = 0; l < Number_of_internal_dofs; l++)
-        {
-          // Loop over hermite dofs (only value dofs in internal nodes)
-          for (unsigned k = 0; k < Number_of_internal_dof_types; k++)
-          {
-            double u_value = get_u_bubble_dof(l, i);
-            interpolated_u[i][0] += u_value * psi_i(l, k);
-            interpolated_u[i][1] += u_value * dpsi_i_dxi(l, k, 0);
-            interpolated_u[i][2] += u_value * dpsi_i_dxi(l, k, 1);
-            interpolated_u[i][3] += u_value * d2psi_i_dxi2(l, k, 0);
-            interpolated_u[i][4] += u_value * d2psi_i_dxi2(l, k, 1);
-            interpolated_u[i][5] += u_value * d2psi_i_dxi2(l, k, 2);
-          }
-        }
-      }
-    }
-
-    /// \short Self-test: Return 0 for OK
-    unsigned self_test();
-
-    // /// \short Output exact soln: x,y,u_exact or x,y,z,u_exact at
-    // /// n_plot^DIM plot points (dummy time-dependent version to
-    // /// keep intel compiler happy)
-    // virtual void output_fct(std::ostream &outfile, const unsigned &n_plot,
-    //                         const double& time,
-    //                         FiniteElement::UnsteadyExactSolutionFctPt
-    //                         exact_soln_pt)
-    //  {
-    //   throw OomphLibError(
-    //    "There is no time-dependent output_fct() for these elements ",
-    //    OOMPH_CURRENT_FUNCTION, OOMPH_EXCEPTION_LOCATION);
-    //  }
-
     // Return the interpolated unit normal
     inline void fill_in_metric_tensor(
       const DenseMatrix<double>& interpolated_drdxi,
@@ -1056,11 +541,10 @@ difference stress is not yet defined so an error has been thrown.",
           // The displacement part
           interpolated_drdxi(i, beta) += eta_u * interpolated_dudxi(i, beta);
           // The coordinate part
-          interpolated_drdxi(i, beta) += (i == beta ? 1 : 0);
+          interpolated_drdxi(i, beta) += (double)(i == beta);
         }
       }
     }
-
 
     // Return the determinant of the metric tensor
     inline double metric_tensor_determinant(
@@ -1456,7 +940,9 @@ difference stress is not yet defined so an error has been thrown.",
       RankFiveTensor<double>& d_moment_du_unknown)
     {
       // Get thickness
-      const double h = this->get_thickness(), nu = this->get_nu();
+      const double h = this->get_thickness();
+      // Get Poisson ratio
+      const double nu = this->get_nu();
       // Zero the moment derivative tensor
       for (unsigned i = 0; i < this->Number_of_displacements; ++i)
       {
@@ -1797,81 +1283,364 @@ difference stress is not yet defined so an error has been thrown.",
       }
     }
 
-    void pin_all_in_plane_dofs()
+
+    //----------------------------------------------------------------------
+    // Control parameters/forcing
+
+    /// Get pressure term at (Eulerian) position x. This function is
+    /// virtual to allow overloading in multi-physics problems where
+    /// the strength of the pressure function might be determined by
+    /// another system of equations.
+    inline virtual void get_pressure(const unsigned& ipt,
+                                     const Vector<double>& x,
+				     const Vector<double>& u,
+				     const DenseMatrix<double>& grad_u,
+                                     const Vector<double>& n,
+                                     Vector<double>& pressure) const
     {
-      double n_displacements = Number_of_displacements;
-      unsigned n_u_nodal_type = this->nu_type_at_each_node();
-      // Pin the nodal dofs
-      for (unsigned inode = 0; inode < this->nnode(); ++inode)
+      // If no pressure function has been set, return zero
+      // Zero the pressure (as a precaution)
+      pressure[0] = 0.0;
+      pressure[1] = 0.0;
+      pressure[2] = 0.0;
+      if (Pressure_fct_pt != 0)
       {
-        Node* nod_pt = this->node_pt(inode);
-        for (unsigned k = 0; k < n_u_nodal_type; ++k)
-        {
-          for (unsigned j = 0; j < n_displacements - 1; ++j)
-          {
-            // Pin kth value and set to zero
-            nod_pt->pin(u_index_koiter_model(k, j));
-            nod_pt->set_value(u_index_koiter_model(k, j), 0.0);
-          }
-        }
-      }
-      // Pin the internal dofs
-      const double n_internal_dofs = this->Number_of_internal_dofs;
-      for (unsigned i = 0; i < n_internal_dofs; ++i)
-      {
-        for (unsigned j = 0; j < n_displacements - 1; ++j)
-        {
-          Data* internal_data_pt = this->internal_data_pt(1);
-          // Pin kth value and set to zero
-          internal_data_pt->pin(i + j * n_internal_dofs);
-          // HERE need a function that can give us this lookup
-          internal_data_pt->set_value(i + j * n_internal_dofs, 0.0);
-        }
+        // Get pressure strength
+        (*Pressure_fct_pt)(x, u, grad_u, n, pressure);
       }
     }
 
-    void pin_out_of_plane_dofs()
+    /// Get pressure term at (Eulerian) position x. This function is
+    /// virtual to allow overloading in multi-physics problems where
+    /// the strength of the pressure function might be determined by
+    /// another system of equations.
+    inline virtual void get_d_pressure_dn(
+      const unsigned& ipt,
+      const Vector<double>& x,
+      const Vector<double>& u,
+      const DenseMatrix<double>& grad_u,
+      const Vector<double>& n,
+      DenseMatrix<double>& d_pressure_dn) const
     {
-      double n_displacements = Number_of_displacements;
-      unsigned n_u_nodal_type = this->nu_type_at_each_node();
-      // Pin the nodal dofs
-      for (unsigned inode = 0; inode < this->nnode(); ++inode)
+      // If no pressure function has been set, return zero
+      // Zero the pressure (as a precaution)
+      for (unsigned i = 0; i < Number_of_displacements; ++i)
       {
-        Node* nod_pt = this->node_pt(inode);
-        for (unsigned k = 0; k < n_u_nodal_type; ++k)
-        {
-          for (unsigned j = n_displacements - 1; j < n_displacements; ++j)
-          {
-            // Pin kth value and set to zero
-            nod_pt->pin(u_index_koiter_model(k, j));
-            nod_pt->set_value(u_index_koiter_model(k, j), 0.0);
-          }
-        }
+	for (unsigned j = 0; j < Number_of_displacements; ++j)
+	{
+	  d_pressure_dn(i, j) = 0.0;
+	}
       }
-      // Pin the internal dofs
-      const double n_internal_dofs = this->Number_of_internal_dofs;
-      for (unsigned i = 0; i < n_internal_dofs; ++i)
+      if (D_pressure_dn_fct_pt != 0)
       {
-        for (unsigned j = n_displacements - 1; j < n_displacements; ++j)
-        {
-          Data* internal_data_pt = this->internal_data_pt(1);
-          // Pin kth value and set to zero
-          internal_data_pt->pin(i + j * n_internal_dofs);
-          // HERE need a function that can give us this lookup
-          internal_data_pt->set_value(i + j * n_internal_dofs, 0.0);
-        }
+        // Get d_p_dn
+        (*D_pressure_dn_fct_pt)(x, u, grad_u, n, d_pressure_dn);
+      }
+    }
+
+    /// Get pressure term at (Eulerian) position x. This function is
+    /// virtual to allow overloading in multi-physics problems where
+    /// the strength of the pressure function might be determined by
+    /// another system of equations.
+    inline virtual void get_d_pressure_dr(
+      const unsigned& ipt,
+      const Vector<double>& x,
+      const Vector<double>& u,
+      const DenseMatrix<double>& grad_u,
+      const Vector<double>& n,
+      DenseMatrix<double>& d_pressure_dr) const
+    {
+      // If no pressure function has been set, return zero
+      // Zero the pressure (as a precaution)
+      for (unsigned i = 0; i < Number_of_displacements; ++i)
+      {
+	for (unsigned j = 0; j < Number_of_displacements; ++j)
+	{
+	  d_pressure_dr(i, j) = 0.0;
+	}
+      }
+      if (D_pressure_dr_fct_pt != 0)
+      {
+        // Get d_p_dn
+        (*D_pressure_dr_fct_pt)(x, u, grad_u, n, d_pressure_dr);
+      }
+    }
+
+    /// Get pressure term at (Eulerian) position x. This function is
+    /// virtual to allow overloading in multi-physics problems where
+    /// the strength of the pressure function might be determined by
+    /// another system of equations.
+    inline void get_d_pressure_d_grad_u(
+      const unsigned& ipt,
+      const Vector<double>& x,
+      const Vector<double>& u,
+      const DenseMatrix<double>& grad_u,
+      const Vector<double>& n,
+      RankThreeTensor<double>& d_pressure_d_grad_u) const
+    {
+      // [zdec] Preserve just to check whether I am stupid
+      // // If no pressure function has been set, return zero
+      // if (D_pressure_dn_fct_pt == 0)
+      // {
+      //   for (unsigned i = 0; i < Number_of_displacements; ++i)
+      //   {
+      //     for (unsigned j = 0; j < Number_of_displacements; ++j)
+      //     {
+      //       for (unsigned alpha = 0; alpha < 2; ++alpha)
+      //       {
+      //         d_pressure_d_grad_u(i, j, alpha) = 0.0;
+      //       }
+      //     }
+      //   }
+      // }
+      // else
+      // {
+      //   // Zero the pressure (as a precaution)
+      //   for (unsigned i = 0; i < Number_of_displacements; ++i)
+      //   {
+      //     for (unsigned j = 0; j < Number_of_displacements; ++j)
+      //     {
+      //       for (unsigned alpha = 0; alpha < 2; ++alpha)
+      //       {
+      //         d_pressure_d_grad_u(i, j, alpha) = 0.0;
+      //       }
+      //     }
+      //   }
+      //   // Get d_p_dn
+      //   (*D_pressure_d_grad_u_fct_pt)(x, u, grad_u, n, d_pressure_d_grad_u);
+      // }
+
+      // If no pressure function has been set, return zero
+      // Zero the pressure (as a precaution)
+      for (unsigned i = 0; i < Number_of_displacements; ++i)
+      {
+	for (unsigned j = 0; j < Number_of_displacements; ++j)
+	{
+	  for (unsigned alpha = 0; alpha < 2; ++alpha)
+	  {
+	    d_pressure_d_grad_u(i, j, alpha) = 0.0;
+	  }
+	}
+      }
+      if (D_pressure_d_grad_u_fct_pt != 0)
+      {
+        // Get d_p_dn
+        (*D_pressure_d_grad_u_fct_pt)(x, u, grad_u, n, d_pressure_d_grad_u);
       }
     }
 
 
-    /// \short get the coordinate
-    virtual void get_coordinate_x(const Vector<double>& s,
-                                  Vector<double>& x) const = 0;
+    //----------------------------------------------------------------------
+    // Jacobian and residual contributions
 
-    /// \short HERE eta_u is untested feature so we have disabled it until we
-    /// have validated it
-    //  ///Access function to the z displacement scaling in the displacement.
-    //  virtual const double*& eta_u_pt() {return Eta_u_pt;}
+    /// Enable Finite difference Jacobian
+    void enable_finite_difference_jacobian()
+    {
+      Use_finite_difference_jacobian = true;
+    }
+
+    /// Disable Finite difference Jacobian
+    void disable_finite_difference_jacobian()
+    {
+      Use_finite_difference_jacobian = false;
+    }
+
+    /// Return the index at which the ith displacement kth type (unknown) value
+    /// is stored. In derived multi-physics elements, this function should be
+    /// overloaded to reflect the chosen storage scheme. Note that these
+    /// equations require that the unknown is always stored at the same index at
+    /// each node, the inteface may .
+    inline virtual unsigned nodal_index_of_u_i(const unsigned& i_field,
+					       const unsigned& k_type) const
+    {
+      return i_field * (this->nu_type_at_each_node()) + k_type;
+    }
+
+    /// Add the element's contribution to its residual vector (wrapper)
+    void fill_in_contribution_to_residuals(Vector<double>& residuals)
+    {
+      // Call the generic residuals function with flag set to 0
+      // using a dummy matrix argument
+      fill_in_generic_residual_contribution_koiter_steigmann(
+        residuals, GeneralisedElement::Dummy_matrix, 0);
+    }
+
+
+    /// Add the element's contribution to its residual vector and
+    /// element Jacobian matrix (wrapper)
+    void fill_in_contribution_to_jacobian(Vector<double>& residuals,
+                                          DenseMatrix<double>& jacobian)
+    {
+      // Call the generic routine with the flag set to 1
+      if (!Use_finite_difference_jacobian)
+      {
+        fill_in_generic_residual_contribution_koiter_steigmann(
+          residuals, jacobian, 1);
+      }
+      else
+      {
+        // Otherwise call the default
+        FiniteElement::fill_in_contribution_to_jacobian(residuals, jacobian);
+      }
+    }
+
+    /// Add the element's contribution to its residual vector and
+    /// element Jacobian matrix (wrapper)
+    void fill_in_contribution_to_jacobian_and_mass_matrix(
+      Vector<double>& residuals,
+      DenseMatrix<double>& jacobian,
+      DenseMatrix<double>& mass_matrix)
+    {
+      // Call fill in Jacobian
+      fill_in_contribution_to_jacobian(residuals, jacobian);
+      // There is no mass matrix: we will just want J w = 0
+
+      // -- COPIED FROM DISPLACMENT FVK EQUATIONS --
+      // Dummy diagonal (won't result in global unit matrix but
+      // doesn't matter for zero eigenvalue/eigenvector
+      unsigned ndof = mass_matrix.nrow();
+      for (unsigned i = 0; i < ndof; i++)
+      {
+        mass_matrix(i, i) += 1.0;
+      }
+    }
+
+
+    //----------------------------------------------------------------------
+    // Misc
+
+    /// Self-test: Return 0 for OK
+    unsigned self_test();
+
+
+    //--------------------------------------------------------------------------
+    // Member data access functions
+
+    /// Access function: Pointer to pressure function
+    inline PressureVectorFctPt& pressure_fct_pt()
+    {
+      return Pressure_fct_pt;
+    }
+
+    /// Access function: Pointer to pressure function
+    inline DPressureVectorFctPt& d_pressure_dn_fct_pt()
+    {
+      return D_pressure_dn_fct_pt;
+    }
+
+    /// Access function: Pointer to pressure function
+    inline DPressureVectorFctPt& d_pressure_dr_fct_pt()
+    {
+      return D_pressure_dr_fct_pt;
+    }
+
+    /// Access function: Pointer to pressure function
+    inline DPressureVectorDMatrixFctPt& d_pressure_d_grad_u_fct_pt()
+    {
+      return D_pressure_d_grad_u_fct_pt;
+    }
+
+    /// Access function: Pointer to Stress function
+    inline StressFctPt& stress_fct_pt()
+    {
+      return Stress_fct_pt;
+    }
+
+    /// Access function: Pointer to Stress function
+    inline DStressFctPt& d_stress_fct_pt()
+    {
+      return D_stress_fct_pt;
+    }
+
+    /// Access function: Pointer to error metric function
+    inline ErrorMetricFctPt& error_metric_fct_pt()
+    {
+      return Error_metric_fct_pt;
+    }
+
+    /// Access function: Pointer to multiple error metric function
+    inline MultipleErrorMetricFctPt& multiple_error_metric_fct_pt()
+    {
+      return Multiple_error_metric_fct_pt;
+    }
+
+    /// Access function: Pointer to pressure function. Const version
+    inline PressureVectorFctPt pressure_fct_pt() const
+    {
+      return Pressure_fct_pt;
+    }
+
+    /// Access function: Pointer to pressure function
+    inline DPressureVectorFctPt d_pressure_dn_fct_pt() const
+    {
+      return D_pressure_dn_fct_pt;
+    }
+
+    /// Access function: Pointer to pressure function
+    inline DPressureVectorFctPt d_pressure_dr_fct_pt() const
+    {
+      return D_pressure_dr_fct_pt;
+    }
+
+    /// Access function: Pointer to pressure function
+    inline DPressureVectorDMatrixFctPt d_pressure_d_grad_u_fct_pt() const
+    {
+      return D_pressure_d_grad_u_fct_pt;
+    }
+
+    /// Access function: Pointer to stress function. Const version
+    inline StressFctPt stress_fct_pt() const
+    {
+      return Stress_fct_pt;
+    }
+
+    /// Access function: Pointer to stress function. Const version
+    inline DStressFctPt d_stress_fct_pt() const
+    {
+      return D_stress_fct_pt;
+    }
+
+    /// Access function: Pointer to error metric function function
+    inline ErrorMetricFctPt error_metric_fct_pt() const
+    {
+      return Error_metric_fct_pt;
+    }
+
+    /// Access function: Pointer to multiple error metric function
+    inline MultipleErrorMetricFctPt multiple_error_metric_fct_pt() const
+    {
+      return Multiple_error_metric_fct_pt;
+    }
+
+    /// Access function to the Poisson ratio.
+    inline const double*& nu_pt()
+    {
+      return Nu_pt;
+    }
+
+    /// Access function to the Poisson ratio.
+    inline const double*& thickness_pt()
+    {
+      return Thickness_pt;
+    }
+
+    /// Access function to the Poisson ratio (const version)
+    inline const double& get_nu() const
+    {
+      return *Nu_pt;
+    }
+
+    /// Access function to the Poisson ratio (const version)
+    inline const double& get_thickness() const
+    {
+      return *Thickness_pt;
+    }
+
+    /// Access function to the displacment scaling.
+    virtual const double*& eta_u_pt()
+    {
+      return Eta_u_pt;
+    }
 
     /// Access function to the in plane displacment scaling in the displacement.
     virtual const double*& eta_sigma_pt()
@@ -1892,50 +1661,250 @@ difference stress is not yet defined so an error has been thrown.",
       return *Eta_sigma_pt;
     }
 
+    // // Get the kth dof type at internal point l
+    // virtual double get_u_bubble_dof(const unsigned& l,
+    //                                 const unsigned& k) const = 0;
+
+    // // Get the kth equation at internal point l
+    // virtual int local_u_bubble_equation(const unsigned& l,
+    //                                     const unsigned& k) const = 0;
+
+    // // Get the number of basis functions, pure virtual
+    // virtual double n_basis_functions() = 0;
+    // // Get the number of basic basis functions, pure virtual
+    // virtual double n_basic_basis_functions() = 0;
+
+    // /// \short Output exact soln: x,y,u_exact or x,y,z,u_exact at
+    // /// n_plot^DIM plot points (dummy time-dependent version to
+    // /// keep intel compiler happy)
+    // virtual void output_fct(std::ostream &outfile, const unsigned &n_plot,
+    //                         const double& time,
+    //                         FiniteElement::UnsteadyExactSolutionFctPt
+    //                         exact_soln_pt)
+    //  {
+    //   throw OomphLibError(
+    //    "There is no time-dependent output_fct() for these elements ",
+    //    OOMPH_CURRENT_FUNCTION, OOMPH_EXCEPTION_LOCATION);
+    //  }
+
+    // void pin_all_in_plane_dofs()
+    // {
+    //   double n_displacements = Number_of_displacements;
+    //   unsigned n_u_nodal_type = this->nu_type_at_each_node();
+    //   // Pin the nodal dofs
+    //   for (unsigned inode = 0; inode < this->nnode(); ++inode)
+    //   {
+    //     Node* nod_pt = this->node_pt(inode);
+    //     for (unsigned k = 0; k < n_u_nodal_type; ++k)
+    //     {
+    //       for (unsigned j = 0; j < n_displacements - 1; ++j)
+    //       {
+    //         // Pin kth value and set to zero
+    //         nod_pt->pin(u_index_koiter_model(k, j));
+    //         nod_pt->set_value(u_index_koiter_model(k, j), 0.0);
+    //       }
+    //     }
+    //   }
+    //   // Pin the internal dofs
+    //   const double n_internal_dofs = this->Number_of_internal_dofs;
+    //   for (unsigned i = 0; i < n_internal_dofs; ++i)
+    //   {
+    //     for (unsigned j = 0; j < n_displacements - 1; ++j)
+    //     {
+    //       Data* internal_data_pt = this->internal_data_pt(1);
+    //       // Pin kth value and set to zero
+    //       internal_data_pt->pin(i + j * n_internal_dofs);
+    //       // HERE need a function that can give us this lookup
+    //       internal_data_pt->set_value(i + j * n_internal_dofs, 0.0);
+    //     }
+    //   }
+    // }
+
+    // void pin_out_of_plane_dofs()
+    // {
+    //   double n_displacements = Number_of_displacements;
+    //   unsigned n_u_nodal_type = this->nu_type_at_each_node();
+    //   // Pin the nodal dofs
+    //   for (unsigned inode = 0; inode < this->nnode(); ++inode)
+    //   {
+    //     Node* nod_pt = this->node_pt(inode);
+    //     for (unsigned k = 0; k < n_u_nodal_type; ++k)
+    //     {
+    //       for (unsigned j = n_displacements - 1; j < n_displacements; ++j)
+    //       {
+    //         // Pin kth value and set to zero
+    //         nod_pt->pin(u_index_koiter_model(k, j));
+    //         nod_pt->set_value(u_index_koiter_model(k, j), 0.0);
+    //       }
+    //     }
+    //   }
+    //   // Pin the internal dofs
+    //   const double n_internal_dofs = this->Number_of_internal_dofs;
+    //   for (unsigned i = 0; i < n_internal_dofs; ++i)
+    //   {
+    //     for (unsigned j = n_displacements - 1; j < n_displacements; ++j)
+    //     {
+    //       Data* internal_data_pt = this->internal_data_pt(1);
+    //       // Pin kth value and set to zero
+    //       internal_data_pt->pin(i + j * n_internal_dofs);
+    //       // HERE need a function that can give us this lookup
+    //       internal_data_pt->set_value(i + j * n_internal_dofs, 0.0);
+    //     }
+    //   }
+    // }
+
+
+    // /// \short get the coordinate
+    // virtual void get_coordinate_x(const Vector<double>& s,
+    //                               Vector<double>& x) const = 0;
+
+    /// \short HERE eta_u is untested feature so we have disabled it until we
+    /// have validated it
+    //  ///Access function to the z displacement scaling in the displacement.
+    //  virtual const double*& eta_u_pt() {return Eta_u_pt;}
+
+
+
+
   protected:
-    /// \short Shape/test functions and derivs w.r.t. to global coords at
-    /// local coord. s; return  Jacobian of mapping
-    virtual double d2shape_and_d2test_eulerian_biharmonic(
-      const Vector<double>& s,
-      Shape& psi,
-      Shape& psi_b,
-      DShape& dpsi_dx,
-      DShape& dpsi_b_dx,
-      DShape& d2psi_dx2,
-      DShape& d2psi_b_dx2,
-      Shape& test,
-      Shape& test_b,
-      DShape& dtest_dx,
-      DShape& dtest_b_dx,
-      DShape& d2test_dx2,
-      DShape& d2test_b_dx2) const = 0;
+    //--------------------------------------------------------------------------
+    // Pure virtual interfaces which must be implemented when geometry and bases
+    // are added in the derived class
 
-    /// \short Shape/test functions and derivs w.r.t. to global coords at
-    /// local coord. s; return  Jacobian of mapping
-    virtual double dshape_and_dtest_eulerian_biharmonic(
-      const Vector<double>& s,
-      Shape& psi,
-      Shape& psi_b,
-      DShape& dpsi_dx,
-      DShape& dpsi_b_dx,
-      Shape& test,
-      Shape& test_b,
-      DShape& dtest_dx,
-      DShape& dtest_b_dx) const = 0;
+    /// (pure virtual) interface to return a vector of the index of each
+    /// displacement unkonwn in the grander scheme of unknowns
+    virtual Vector<unsigned> u_field_indices() const = 0;
 
-    /// \short Shape/test functions at local coordinate s
-    virtual void shape_and_test_biharmonic(const Vector<double>& s,
-                                           Shape& psi,
-                                           Shape& psi_b,
-                                           Shape& test,
-                                           Shape& test_b) const = 0;
+    /// (pure virtual) interface to return a vector of the index of the u_i
+    /// displacement unkonwn in the grander scheme of unknowns
+    virtual unsigned u_i_field_index(const unsigned& i_field) const
+    {
+      return i_field;
+    }
+
+    /// (pure virtual) interface to return the number of nodes used to
+    /// interpolate each displacement field
+    virtual unsigned nu_node() const = 0;
+
+    /// (pure virtual) interface to get the local indices of the nodes used by u
+    virtual Vector<unsigned> get_u_node_indices() const = 0;
+
+    /// (pure virtual) interface to get the number of basis types for u at node
+    /// j
+    virtual unsigned nu_type_at_each_node() const = 0;
+
+    /// (pure virtual) interface to retrieve the value of u_alpha at node j of
+    /// type k
+    virtual double get_u_i_value_at_node_of_type(
+      const unsigned& i_field,
+      const unsigned& j_node,
+      const unsigned& k_type) const = 0;
+
+    /// (pure virtual) interface to retrieve the t-th history value value of
+    /// u_alpha at node j of type k
+    virtual double get_u_i_value_at_node_of_type(
+      const unsigned& t_time,
+      const unsigned& i_field,
+      const unsigned& j_node,
+      const unsigned& k_type) const = 0;
+
+    /// (pure virtual) interface to get the pointer to the internal data used to
+    /// interpolate u_i (NOTE: assumes each u field has exactly one internal
+    /// data)
+    virtual Data* u_i_internal_data_pt(
+      const unsigned& i_field) const = 0;
+
+    /// (pure virtual) interface to get the number of internal types for the u
+    /// fields
+    virtual unsigned nu_type_internal() const = 0;
+
+    /// (pure virtual) interface to retrieve the value of u_alpha of internal
+    /// type k
+    virtual double get_u_i_internal_value_of_type(
+      const unsigned& i_field,
+      const unsigned& k_type) const = 0;
+
+    /// (pure virtual) interface to retrieve the t-th history value of u_alpha
+    /// of internal type k
+    virtual double get_u_i_internal_value_of_type(
+      const unsigned& time,
+      const unsigned& i_field,
+      const unsigned& k_type) const = 0;
+
+
+    /// (pure virtual) Out-of-plane basis functions at local coordinate s
+    virtual void basis_u_koiter_steigmann(const Vector<double>& s,
+                                           Shape& psi_n,
+                                           Shape& psi_i) const = 0;
+
+    /// (pure virtual) Out-of-plane basis functions and derivs w.r.t. global
+    /// coords at local coordinate s; return det(Jacobian of mapping)
+    virtual double d2basis_u_eulerian_koiter_steigmann(
+      const Vector<double>& s,
+      Shape& psi_n,
+      Shape& psi_i,
+      DShape& dpsi_n_dx,
+      DShape& dpsi_i_dx,
+      DShape& d2psi_n_dx2,
+      DShape& d2psi_i_dx2) const = 0;
+
+    /// (pure virtual) Out-of-plane basis/test functions at local coordinate s
+    virtual void basis_and_test_u_koiter_steigmann(
+      const Vector<double>& s,
+      Shape& psi_n,
+      Shape& psi_i,
+      Shape& test_n,
+      Shape& test_i) const = 0;
+
+    /// (pure virtual) Out-of-plane basis/test functions and first derivs w.r.t.
+    /// to global coords at local coordinate s; return det(Jacobian of mapping)
+    virtual double dbasis_and_dtest_u_eulerian_koiter_steigmann(
+      const Vector<double>& s,
+      Shape& psi_n,
+      Shape& psi_i,
+      DShape& dpsi_n_dx,
+      DShape& dpsi_i_dx,
+      Shape& test_n,
+      Shape& test_i,
+      DShape& dtest_n_dx,
+      DShape& dtest_i_dx) const = 0;
+
+    /// (pure virtual) Out-of-plane basis/test functions and first/second derivs
+    /// w.r.t. to global coords at local coordinate s;
+    /// return det(Jacobian of mapping)
+    virtual double d2basis_and_d2test_u_eulerian_koiter_steigmann(
+      const Vector<double>& s,
+      Shape& psi_n,
+      Shape& psi_i,
+      DShape& dpsi_n_dx,
+      DShape& dpsi_i_dx,
+      DShape& d2psi_n_dx2,
+      DShape& d2psi_i_dx2,
+      Shape& test_n,
+      Shape& test_i,
+      DShape& dtest_n_dx,
+      DShape& dtest_i_dx,
+      DShape& d2test_n_dx2,
+      DShape& d2test_i_dx2) const = 0;
+
+    // End of pure virtual interface functions
+    //----------------------------------------------------------------------------
+
+
 
     /// \short Compute element residual Vector only (if flag=and/or element
     /// Jacobian matrix
-    virtual void fill_in_generic_residual_contribution_biharmonic(
+    virtual void fill_in_generic_residual_contribution_koiter_steigmann(
       Vector<double>& residuals,
       DenseMatrix<double>& jacobian,
       const unsigned& flag);
+
+
+
+    // All member data is private
+  private:
+    /// Flag to use finite difference jacobian
+    bool Use_finite_difference_jacobian;
 
     /// Pointer to pressure function:
     PressureVectorFctPt Pressure_fct_pt;
@@ -1955,31 +1924,11 @@ difference stress is not yet defined so an error has been thrown.",
     /// Pointer to epsilon derivative of stress function
     DStressFctPt D_stress_fct_pt;
 
-    /// Pointer to error metric
-    ErrorMetricFctPt Error_metric_fct_pt;
-
-    /// Pointer to error metric when we want multiple errors
-    MultipleErrorMetricFctPt Multiple_error_metric_fct_pt;
-
     /// Pointer to Poisson ratio, which this element cannot modify
     const double* Nu_pt;
 
     /// Pointer to Non dimensional thickness parameter
     const double* Thickness_pt;
-
-    /// \short unsigned that holds the internal 'bubble' dofs the element has -
-    // zero for Bell Elements and 3 for C1 curved elements
-    unsigned Number_of_internal_dofs;
-
-    /// \short unsigned that holds the number if displacments the element has
-    static const unsigned Number_of_displacements;
-
-    /// \short unsigned that holds the number of displacements the element has
-    static const double Default_Nu_Value;
-
-    static const double Default_Eta_Value; // HERE MOVE
-
-    static const double Default_Thickness_Value;
 
     /// Pointer to displacement scaling
     const double* Eta_u_pt;
@@ -1987,22 +1936,34 @@ difference stress is not yet defined so an error has been thrown.",
     /// Pointer to stress scaling
     const double* Eta_sigma_pt;
 
-    /// \short unsigned that holds the number of types of degree of freedom at
-    /// each
-    // internal point that the element has zero for Bell Elements and 1
-    //// for C1 curved elements
-    unsigned Number_of_internal_dof_types;
+    /// Pointer to error metric
+    ErrorMetricFctPt Error_metric_fct_pt;
 
-  protected:
-    /// Pointer to precomputed matrix that associates shape functions to
-    /// monomials
-    DenseMatrix<double>* Association_matrix_pt;
+    /// Pointer to error metric when we want multiple errors
+    MultipleErrorMetricFctPt Multiple_error_metric_fct_pt;
 
-    /// Flag to use finite difference jacobian
-    bool Use_finite_difference_jacobian;
+    // /// \short unsigned that holds the internal 'bubble' dofs the element has -
+    // // zero for Bell Elements and 3 for C1 curved elements
+    // unsigned Number_of_internal_dofs;
 
-    /// Bool to flag up when assocation matrix is cached
-    bool Association_matrix_is_cached;
+    // /// \short unsigned that holds the number of types of degree of freedom at
+    // /// each
+    // // internal point that the element has zero for Bell Elements and 1
+    // //// for C1 curved elements
+    // unsigned Number_of_internal_dof_types;
+
+    /// unsigned that holds the number if displacments the element has
+    static const unsigned Number_of_displacements;
+
+    /// Default value of Nu incase not user set
+    static const double Default_Nu_Value;
+
+    /// Default value of Eta incase not user set
+    static const double Default_Eta_Value; // HERE MOVE
+
+    /// Default value of Thickness incase not user set
+    static const double Default_Thickness_Value;
+
 
   };
 

@@ -7,8 +7,7 @@ sources = \
  koiter_steigmann_curvable_bell_elements.cc
 
 # Define the headers
-headers = 
- koiter_steigmann.h \
+headers = \
  koiter_steigmann_equations.h \
  koiter_steigmann_curvable_bell_elements.h
 
@@ -18,13 +17,16 @@ libname = c1_koiter_steigmann
 # Combine headers and sources
 headers_and_sources = $(headers) $(sources)
 
+
 # Define the library that gets placed in lib directory
 #-----------------------------------------------------
 lib_LTLIBRARIES = libc1_koiter_steigmann.la
 
+
 # Sources that the library depends on: 
 #-------------------------------------
 libc1_koiter_steigmann_la_SOURCES = $(headers_and_sources)
+
 
 # The library's include headers:
 #-------------------------------
