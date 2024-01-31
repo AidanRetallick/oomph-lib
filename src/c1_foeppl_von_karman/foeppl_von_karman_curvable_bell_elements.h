@@ -399,7 +399,7 @@ namespace oomph
   /// These elements use TElement<2,NNODE_1D> with Lagrangian bases to
   /// interpolate the in-plane unknowns u_x, u_y although with sub-parametric
   /// simplex shape interpolation.
-  ///
+
   /// The Bell Hermite basis is used to interpolate the out-of-plane unknown w
   /// for straight sided elements and is upgraded to Bernadou basis if the
   /// element is on a curved boundary. This upgrade similarly corrects the shape
@@ -437,14 +437,18 @@ namespace oomph
       public virtual FoepplVonKarmanEquations
   {
   public:
+
+    //----------------------------------------------------------------------
+    // Class construction
+
     /// Constructor: Call constructors for C1CurvableBellElement and
-    /// FoepplVonKarman equations
+    /// FoepplVonKarmanEquations
     FoepplVonKarmanC1CurvableBellElement()
       : CurvableBellElement<NNODE_1D>(Nfield, Field_is_bell_interpolated),
         FoepplVonKarmanEquations()
-    // Rotated_basis_fct_pt(0) // [zdec] old rotation
-    // Nnodes_to_rotate(0)
     {
+      // Use the higher order integration scheme
+      delete this->integral_pt();
       // Use the higher order integration scheme
       TGauss<2, 4>* new_integral_pt = new TGauss<2, 4>;
       this->set_integration_scheme(new_integral_pt);
@@ -474,29 +478,76 @@ namespace oomph
     }
 
 
-    /// Get the zeta coordinate
-    inline void interpolated_zeta(const Vector<double>& s,
-                                  Vector<double>& zeta) const
+    //----------------------------------------------------------------------
+    // Output and documentation
+
+    /// Output function:
+    ///  x, y, ux, uy, w
+    void output(std::ostream& outfile)
     {
-      // If there is a macro element use it
-      if (this->Macro_elem_pt != 0)
-      {
-        this->get_x_from_macro_element(s, zeta);
-      }
-      // Otherwise interpolate zeta_nodal using the shape functions
-      else
-      {
-        interpolated_x(s, zeta);
-      }
+      FoepplVonKarmanEquations::output(outfile);
     }
 
-    /// Lagrange interpolated shape for in--plane displacements
-    void shape_u(const Vector<double>& s, Shape& psi) const;
+    /// Full output function with a rich set of unknowns:
+    ///  x, y, ux, uy, w, dw, ddw, du, strain, stress, principal stress
+    void full_output(std::ostream& outfile)
+    {
+      FoepplVonKarmanEquations::full_output(outfile);
+    }
 
-    /// Lagrange interpolated d_shape for in--plane displacements
-    void dshape_u_local(const Vector<double>& s,
-                        Shape& psi,
-                        DShape& dpsids) const;
+    /// Output function:
+    ///   x,y,u   or    x,y,z,u at n_plot*(n_plot+1)/2 plot points
+    void output(std::ostream& outfile, const unsigned& n_plot)
+    {
+      FoepplVonKarmanEquations::output(outfile, n_plot);
+    }
+
+    /// Output function:
+    ///   x,y,u   or    x,y,z,u at n_plot*(n_plot+1)/2plot points
+    void output_interpolated_exact_soln(
+      std::ostream& outfile,
+      FiniteElement::SteadyExactSolutionFctPt exact_soln_pt,
+      const unsigned& n_plot);
+
+    /// C-style output function:
+    ///  x,y,u   or    x,y,z,u
+    void output(FILE* file_pt)
+    {
+      FoepplVonKarmanEquations::output(file_pt);
+    }
+
+    /// C-style output function:
+    ///   x,y,u   or    x,y,z,u at n_plot*(n_plot+1)/2 plot points
+    void output(FILE* file_pt, const unsigned& n_plot)
+    {
+      FoepplVonKarmanEquations::output(file_pt, n_plot);
+    }
+
+
+    /// Output function for an exact solution:
+    ///  x,y,u_exact   or    x,y,z,u_exact at n_plot*(n_plot+1)/2 plot points
+    void output_fct(std::ostream& outfile,
+                    const unsigned& n_plot,
+                    FiniteElement::SteadyExactSolutionFctPt exact_soln_pt)
+    {
+      FoepplVonKarmanEquations::output_fct(outfile, n_plot, exact_soln_pt);
+    }
+
+    /// Output function for a time-dependent exact solution.
+    ///  x,y,u_exact   or    x,y,z,u_exact at n_plot*(n_plot+1)/2 points
+    /// (Calls the steady version)
+    void output_fct(std::ostream& outfile,
+                    const unsigned& n_plot,
+                    const double& time,
+                    FiniteElement::UnsteadyExactSolutionFctPt exact_soln_pt)
+    {
+      FoepplVonKarmanEquations::output_fct(
+        outfile, n_plot, time, exact_soln_pt);
+    }
+
+
+    //----------------------------------------------------------------------
+    // Jacobian and residual contributions
 
     /// Add the element's contribution to its residual vector (wrapper) with
     /// cached association matrix
@@ -524,16 +575,111 @@ namespace oomph
       this->delete_association_matrix();
     }
 
+
+    //----------------------------------------------------------------------
+    // Geometry and boundaries
+
+    /// Function to pin all deflection dofs
+    void pin_all_deflection_dofs() const;
+
+    /// Function to pin the j-th in-plane displacement dof at all nodes along
+    /// boundary b to the value prescribed by specified_u_j_pt
+    void fix_in_plane_displacement_dof(const unsigned& j_type,
+                                       const unsigned& b,
+                                       const ScalarFctPt& specified_u_j_pt);
+
+    /// Function to pin the j-th out-of-plane displacement dof at all nodes
+    /// along boundary b to the value prescribed by specified_w_j_pt
+    void fix_out_of_plane_displacement_dof(const unsigned& dof_number,
+                                           const unsigned& b,
+                                           const ScalarFctPt& specified_w_j_pt);
+
+
+    // [zdec] I think i misnamed this, should it be interpolated_x?
+    /// Get the zeta coordinate
+    inline void interpolated_zeta(const Vector<double>& s,
+                                  Vector<double>& zeta) const
+    {
+      // If there is a macro element use it
+      if (this->Macro_elem_pt != 0)
+      {
+        this->get_x_from_macro_element(s, zeta);
+      }
+      // Otherwise interpolate zeta_nodal using the shape functions
+      else
+      {
+        interpolated_x(s, zeta);
+      }
+    }
+
+    /// Return true if the element has been upgraded to interpolate a curved
+    /// boundary
+    bool element_is_curved() const
+    {
+      return CurvableBellElement<NNODE_1D>::element_is_curved();
+    }
+
+    /// Upgrade the Bell element to a curved Bernadou element. Expects, in
+    /// order, the unsigned enumeration of the edge that is on the boundary
+    /// (curved_edge) as well as the coordinates of the start and end of that
+    /// edge on the boundary (s_ubar,s_obar), the parametric description of the
+    /// curved edge (parametric_edge) and lastly the polynomial order of the
+    /// boundary interpolation (boundary_order) which can be either 3 or 5.
+    virtual void upgrade_element_to_curved(
+      const MyC1CurvedElements::Edge& curved_edge,
+      const double& s_ubar,
+      const double& s_obar,
+      CurvilineGeomObject* parametric_edge,
+      const unsigned& boundary_order)
+    {
+      CurvableBellElement<NNODE_1D>::upgrade_element_to_curved(
+        curved_edge, s_ubar, s_obar, parametric_edge, boundary_order);
+    }
+
+
+    //----------------------------------------------------------------------
+    // Member data access functions
+
+    /// Access function to rotated boundary helper object
+    RotatedBoundaryHelper* rotated_boundary_helper_pt()
+    {
+      return Rotated_boundary_helper_pt;
+    }
+
+    /// Access the number of fields
+    unsigned nfield()
+    {
+      return Nfield;
+    }
+
+    /// Access the status of the interpolation of each field
+    std::vector<bool> field_is_bell_interpolated()
+    {
+      return Field_is_bell_interpolated;
+    }
+
+    /// Required  # of `values' (pinned or dofs)
+    /// at node n
+    inline unsigned required_nvalue(const unsigned& n) const
+    {
+      return Initial_Nvalue[n];
+    }
+
+
+
+  protected:
     //----------------------------------------------------------------------------
     // Interface to FoepplVonKarmanEquations (can this all be (static) data?)
 
-    /// Field indices for u
+    /// Function to return a vector of the indices of the in-plane fvk
+    /// displacement unkonwns in the grander scheme of unknowns
     virtual Vector<unsigned> u_field_indices() const
     {
       return {0, 1};
     }
 
-    /// Field indices for u
+    /// Function to return the index of the alpha-th in-plane displacement
+    /// unkonwns in the grander scheme of unknowns
     virtual unsigned u_alpha_field_index(const unsigned& alpha) const
     {
       return alpha;
@@ -587,7 +733,6 @@ namespace oomph
       return CurvableBellElement<NNODE_1D>::nnodal_basis_type_for_field(
         w_field_index());
     }
-
 
     /// Interface to retrieve the value of u_alpha at node j of
     /// type k
@@ -694,6 +839,7 @@ namespace oomph
     // 						    const unsigned& alpha,
     // 						    const unsigned& k_type) const = 0;
 
+
     /// Interface to retrieve the value of w of internal type k
     virtual double get_w_internal_value_of_type(const unsigned& k_type) const
     {
@@ -712,10 +858,6 @@ namespace oomph
         t_time, index, k_type);
     }
 
-
-  protected:
-    //----------------------------------------------------------------
-    // Basis and test retrieval functions
 
     /// In-plane basis functions and derivatives w.r.t. global
     /// coords at local coordinate s; return det(Jacobian of mapping)
@@ -794,41 +936,9 @@ namespace oomph
     // End of FoepplVonKarmanEquations interface functions
     //----------------------------------------------------------------------------
 
-  public:
-    /// Function to pin all deflection dofs
-    void pin_all_deflection_dofs() const;
 
-    /// Function to pin particular in--plane displacement dofs
-    void fix_in_plane_displacement_dof(const unsigned& dof_number,
-                                       const unsigned& b,
-                                       const ScalarFctPt& u);
-
-    /// Function to pin particular out--of--plane displacement dofs
-    void fix_out_of_plane_displacement_dof(const unsigned& dof_number,
-                                           const unsigned& b,
-                                           const ScalarFctPt& w);
-
-    // Is this element curved?
-    bool element_is_curved() const
-    {
-      return CurvableBellElement<NNODE_1D>::element_is_curved();
-    }
-
-    /// Access function to rotated boundary helper object
-    RotatedBoundaryHelper* rotated_boundary_helper_pt()
-    {
-      return Rotated_boundary_helper_pt;
-    }
-
-  protected:
-    /// Pointer to an instance of rotated boundary helper
-    RotatedBoundaryHelper* Rotated_boundary_helper_pt;
-
-    // // [zdec] Old rotation -- delete
-    // /// Get rotation matrices that change the degrees of freedom to the basis
-    // /// set by Boundary_parametrisation_pt
-    // inline void rotation_matrix_at_node(const unsigned& inode,
-    // 					DenseDoubleMatrix& rotation_matrix) const;
+    //----------------------------------------------------------------------
+    // Rotation handling helpers
 
     /// Transform the shape functions so that they correspond to
     /// the new rotated dofs
@@ -844,101 +954,14 @@ namespace oomph
                              DShape& dshape,
                              DShape& d2shape) const;
 
-  public:
-    // // [zdec] old rotation
-    // /// Set up the rotated degrees of freedom
-    // inline void set_up_rotated_dofs(
-    //   const unsigned& nnodes_to_rotate,
-    //   const Vector<unsigned>& nodes_to_rotate,
-    //   const BasisVectorsFctPt& basis_vectors_fct_pt);
-
-    /// Upgrade the Bell element to a curved Bernadou element
-    virtual void upgrade_element_to_curved(
-      const MyC1CurvedElements::Edge& curved_edge,
-      const double& s_ubar,
-      const double& s_obar,
-      CurvilineGeomObject* parametric_edge,
-      const unsigned& boundary_order)
-    {
-      CurvableBellElement<NNODE_1D>::upgrade_element_to_curved(
-        curved_edge, s_ubar, s_obar, parametric_edge, boundary_order);
-    }
-
-    /// Required  # of `values' (pinned or dofs)
-    /// at node n
-    inline unsigned required_nvalue(const unsigned& n) const
-    {
-      return Initial_Nvalue[n];
-    }
-
-    /// Output function:
-    ///  x, y, ux, uy, w
-    void output(std::ostream& outfile)
-    {
-      FoepplVonKarmanEquations::output(outfile);
-    }
-
-    /// Full output function with a rich set of unknowns:
-    ///  x, y, ux, uy, w, dw, ddw, du, strain, stress, principal stress
-    void full_output(std::ostream& outfile)
-    {
-      FoepplVonKarmanEquations::full_output(outfile);
-    }
-
-    /// Output function:
-    ///   x,y,u   or    x,y,z,u at n_plot*(n_plot+1)/2 plot points
-    void output(std::ostream& outfile, const unsigned& n_plot)
-    {
-      FoepplVonKarmanEquations::output(outfile, n_plot);
-    }
-
-    /// Output function:
-    ///   x,y,u   or    x,y,z,u at n_plot*(n_plot+1)/2plot points
-    void output_interpolated_exact_soln(
-      std::ostream& outfile,
-      FiniteElement::SteadyExactSolutionFctPt exact_soln_pt,
-      const unsigned& n_plot);
-
-    /// C-style output function:
-    ///  x,y,u   or    x,y,z,u
-    void output(FILE* file_pt)
-    {
-      FoepplVonKarmanEquations::output(file_pt);
-    }
-
-    /// C-style output function:
-    ///   x,y,u   or    x,y,z,u at n_plot*(n_plot+1)/2 plot points
-    void output(FILE* file_pt, const unsigned& n_plot)
-    {
-      FoepplVonKarmanEquations::output(file_pt, n_plot);
-    }
 
 
-    /// Output function for an exact solution:
-    ///  x,y,u_exact   or    x,y,z,u_exact at n_plot*(n_plot+1)/2 plot points
-    void output_fct(std::ostream& outfile,
-                    const unsigned& n_plot,
-                    FiniteElement::SteadyExactSolutionFctPt exact_soln_pt)
-    {
-      FoepplVonKarmanEquations::output_fct(outfile, n_plot, exact_soln_pt);
-    }
-
-    /// Output function for a time-dependent exact solution.
-    ///  x,y,u_exact   or    x,y,z,u_exact at n_plot*(n_plot+1)/2 points
-    /// (Calls the steady version)
-    void output_fct(std::ostream& outfile,
-                    const unsigned& n_plot,
-                    const double& time,
-                    FiniteElement::UnsteadyExactSolutionFctPt exact_soln_pt)
-    {
-      FoepplVonKarmanEquations::output_fct(
-        outfile, n_plot, time, exact_soln_pt);
-    }
-
-
-    // Private Data Members
-
+    // All member data is private
   private:
+
+    /// Pointer to an instance of rotated boundary helper
+    RotatedBoundaryHelper* Rotated_boundary_helper_pt;
+
     /// Static number of fields (is always 3)
     static const unsigned Nfield;
 
@@ -958,6 +981,7 @@ namespace oomph
   ////////////////////////////////////////////////////////////////////
 
 
+
   //==============================================================================
   /// Face geometry for the FoepplVonKarmanC1CurvableBellElement elements: The
   /// spatial dimension of the face elements is one lower than that of the bulk
@@ -972,6 +996,7 @@ namespace oomph
     /// appropriate lower-dimensional TElement
     FaceGeometry() : TElement<1, NNODE_1D>() {}
   };
+
 
 
   // //[zdec] old rotation
@@ -1119,7 +1144,8 @@ namespace oomph
     // Initialise and get dpsi w.r.t local coord
     const unsigned n_node = this->nnode();
     DShape dummy_dpsids(n_node, dim);
-    dshape_u_local(s, psi_n, dummy_dpsids);
+    TElement<2, NNODE_1D>::
+      dshape_local(s, psi_n, dummy_dpsids);
     double J;
 
     // Get the Jacobian of the mapping
@@ -1148,7 +1174,7 @@ namespace oomph
     // Initialise and get dpsi w.r.t local coord
     const unsigned n_node = this->nnode();
     DShape dpsids(n_node, dim);
-    dshape_u_local(s, psi_n, dpsids);
+    TElement<2, NNODE_1D>::dshape_local(s, psi_n, dpsids);
     double J;
 
     // Get the Jacobian of the mapping
@@ -1192,7 +1218,7 @@ namespace oomph
     // Initialise and get dpsi w.r.t local coord
     const unsigned n_node = this->nnode();
     DShape dpsids(n_node, this->dim());
-    dshape_u_local(s, psi_n, dpsids);
+    TElement<2, NNODE_1D>::dshape_local(s, psi_n, dpsids);
     double J;
 
     // Get the Jacobian of the mapping
@@ -1641,66 +1667,14 @@ shape_and_test_foeppl_von_karman(...)",
 
 
   //=============================================================================
-  /// Function to pin particular out-of-plane displacement dofs
+  /// Function to pin the j-th in-plane displacement dof at all nodes along
+  /// boundary b to the value prescribed by specified_u_j_pt
   //=============================================================================
   template<unsigned NNODE_1D>
-  void FoepplVonKarmanC1CurvableBellElement<
-    NNODE_1D>::fix_out_of_plane_displacement_dof(const unsigned& j_type,
-                                                 const unsigned& b_boundary,
-                                                 const ScalarFctPt&
-                                                   specified_deflection_fct_pt)
-  {
-    const unsigned w_index = w_field_index();
-    const unsigned first_nodal_type_index =
-      this->first_nodal_type_index_for_field(w_index);
-    const unsigned n_vertices = nw_node();
-
-#ifdef PARANOID
-    // Check that the dof number is a sensible value
-    unsigned n_type = nw_type_at_each_node();
-    if (j_type >= n_type)
-    {
-      throw OomphLibError(
-        "Foppl von Karman elements only have 6 Hermite deflection degrees\
-of freedom at internal points. They are {w ; w,x ; w,y ; w,xx ; w,xy ; w,yy}",
-        OOMPH_CURRENT_FUNCTION,
-        OOMPH_EXCEPTION_LOCATION);
-    }
-#endif
-
-    // Bell elements only have deflection dofs at vertices
-    for (unsigned n = 0; n < n_vertices; ++n)
-    {
-      // Get node
-      Node* nod_pt = this->node_pt(n);
-      // Check if it is on the boundary
-      bool is_boundary_node = nod_pt->is_on_boundary(b_boundary);
-      if (is_boundary_node)
-      {
-        // Extract nodal coordinates from node:
-        Vector<double> x(2);
-        x[0] = nod_pt->x(0);
-        x[1] = nod_pt->x(1);
-        // Get value
-        double value;
-        specified_deflection_fct_pt(x, value);
-        // Pin and set the value
-        nod_pt->pin(first_nodal_type_index + j_type);
-        nod_pt->set_value(first_nodal_type_index + j_type, value);
-      }
-    }
-  }
-
-
-  //=============================================================================
-  /// Function to pin particular out-of-plane displacement dofs
-  //=============================================================================
-  template<unsigned NNODE_1D>
-  void FoepplVonKarmanC1CurvableBellElement<
-    NNODE_1D>::fix_in_plane_displacement_dof(const unsigned& alpha,
-                                             const unsigned& b,
-                                             const ScalarFctPt&
-                                               specified_displacement_fct_pt)
+  void FoepplVonKarmanC1CurvableBellElement<NNODE_1D>::
+  fix_in_plane_displacement_dof(const unsigned& alpha,
+				const unsigned& b,
+				const ScalarFctPt& specified_u_j_pt)
   {
     // Initialise constants that we use in this function
     const unsigned field_index = u_alpha_field_index(alpha);
@@ -1739,10 +1713,62 @@ of freedom at internal points. They are {ux, uy}",
         interpolated_x(s, x);
         // Fill in value
         double value;
-        specified_displacement_fct_pt(x, value);
+        specified_u_j_pt(x, value);
         // Pin and set the value
         nod_pt->pin(alpha);
         nod_pt->set_value(nodal_type_index, value);
+      }
+    }
+  }
+
+
+  //=============================================================================
+  /// Function to pin particular out-of-plane displacement dofs along boundary
+  /// b to the value prescribed by specified_w_j_pt
+  //=============================================================================
+  template<unsigned NNODE_1D>
+  void FoepplVonKarmanC1CurvableBellElement<NNODE_1D>::
+  fix_out_of_plane_displacement_dof(const unsigned& k_type,
+				    const unsigned& b_boundary,
+				    const ScalarFctPt& specified_w_j_pt)
+  {
+    const unsigned w_index = w_field_index();
+    const unsigned first_nodal_type_index =
+      this->first_nodal_type_index_for_field(w_index);
+    const unsigned n_vertices = nw_node();
+
+#ifdef PARANOID
+    // Check that the dof number is a sensible value
+    unsigned n_type = nw_type_at_each_node();
+    if (k_type >= n_type)
+    {
+      throw OomphLibError(
+        "Foppl von Karman elements only have 6 Hermite deflection degrees\
+of freedom at internal points. They are {w ; w,x ; w,y ; w,xx ; w,xy ; w,yy}",
+        OOMPH_CURRENT_FUNCTION,
+        OOMPH_EXCEPTION_LOCATION);
+    }
+#endif
+
+    // Bell elements only have deflection dofs at vertices
+    for (unsigned n = 0; n < n_vertices; ++n)
+    {
+      // Get node
+      Node* nod_pt = this->node_pt(n);
+      // Check if it is on the boundary
+      bool is_boundary_node = nod_pt->is_on_boundary(b_boundary);
+      if (is_boundary_node)
+      {
+        // Extract nodal coordinates from node:
+        Vector<double> x(2);
+        x[0] = nod_pt->x(0);
+        x[1] = nod_pt->x(1);
+        // Get value
+        double value;
+        specified_w_j_pt(x, value);
+        // Pin and set the value
+        nod_pt->pin(first_nodal_type_index + k_type);
+        nod_pt->set_value(first_nodal_type_index + k_type, value);
       }
     }
   }
