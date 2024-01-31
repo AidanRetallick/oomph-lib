@@ -1144,7 +1144,7 @@ namespace oomph
     // Initialise and get dpsi w.r.t local coord
     const unsigned n_node = this->nnode();
     DShape dummy_dpsids(n_node, dim);
-    SubparametricTriangleElement<NNODE_1D>::
+    TElement<2, NNODE_1D>::
       dshape_local(s, psi_n, dummy_dpsids);
     double J;
 
@@ -1174,7 +1174,7 @@ namespace oomph
     // Initialise and get dpsi w.r.t local coord
     const unsigned n_node = this->nnode();
     DShape dpsids(n_node, dim);
-    SubparametricTriangleElement<NNODE_1D>::dshape_local(s, psi_n, dpsids);
+    TElement<2, NNODE_1D>::dshape_local(s, psi_n, dpsids);
     double J;
 
     // Get the Jacobian of the mapping
@@ -1218,7 +1218,7 @@ namespace oomph
     // Initialise and get dpsi w.r.t local coord
     const unsigned n_node = this->nnode();
     DShape dpsids(n_node, this->dim());
-    SubparametricTriangleElement<NNODE_1D>::dshape_local(s, psi_n, dpsids);
+    TElement<2, NNODE_1D>::dshape_local(s, psi_n, dpsids);
     double J;
 
     // Get the Jacobian of the mapping
