@@ -1372,7 +1372,7 @@ namespace oomph
               << sigma_eigenvecs(0, 1) << " " << sigma_eigenvecs(1, 1) << " ";
 
       // End output line
-      outfile << std::endl;
+      outfile << "\n";
     }
     // Write tecplot footer (e.g. FE connectivity lists)
     this->write_tecplot_zone_footer(outfile, nplot);
@@ -1425,6 +1425,10 @@ namespace oomph
       {
         outfile << *it << " ";
       }
+
+      // End plot point line
+      outfile << "\n";
+
     }
 
     // Write tecplot footer (e.g. FE connectivity lists)
