@@ -55,9 +55,16 @@ namespace oomph
     typedef void (*AxisymFoepplvonKarmanPressureFctPt)(const double& r,
                                                        double& f);
 
+    /// Function pointer to prestress function fct(r,f(r)) --
+    /// r is a Vector!
+    typedef void (*AxisymFoepplvonKarmanPrestressFctPt)(const double& r,
+                                                       double& f);
+
     /// Constructor (must initialise the Pressure_fct_pt). Also
     /// set physical parameters to their default values.
-    AxisymFoepplvonKarmanEquations() : Pressure_fct_pt(0), Nu_pt(0) {}
+    AxisymFoepplvonKarmanEquations() : Pressure_fct_pt(0),
+				       Prestress_fct_pt(0),
+				       Nu_pt(0) {}
 
     /// Broken copy constructor
     AxisymFoepplvonKarmanEquations(
@@ -189,6 +196,18 @@ namespace oomph
       return Pressure_fct_pt;
     }
 
+    /// Access function: Pointer to pressure function
+    AxisymFoepplvonKarmanPrestressFctPt& prestress_fct_pt()
+    {
+      return Prestress_fct_pt;
+    }
+
+    /// Access function: Pointer to pressure function. Const version
+    AxisymFoepplvonKarmanPrestressFctPt prestress_fct_pt() const
+    {
+      return Prestress_fct_pt;
+    }
+
     /// Get pressure term at (Eulerian) position r. This function is
     /// virtual to allow overloading in multi-physics problems where
     /// the strength of the pressure function might be determined by
@@ -206,6 +225,26 @@ namespace oomph
       {
         // Get pressure strength
         (*Pressure_fct_pt)(r, pressure);
+      }
+    }
+
+    // Get prestress term at (Eulerian) position r. This function is
+    /// virtual to allow overloading in multi-physics problems where
+    /// the strength of the pressure function might be determined by
+    /// another system of equations.
+    inline void get_prestress_fvk(const unsigned& ipt,
+				  const double& r,
+				  double& prestress) const
+    {
+      // If no pressure function has been set, return zero
+      if (Prestress_fct_pt == 0)
+      {
+        prestress = 0.0;
+      }
+      else
+      {
+        // Get pressure strength
+        (*Pressure_fct_pt)(r, prestress);
       }
     }
 
@@ -302,9 +341,9 @@ namespace oomph
 
 
     /// Compute in-plane stresses
-    void interpolated_stress(const Vector<double>& s,
-                             double& sigma_r_r,
-                             double& sigma_phi_phi) const;
+    virtual void interpolated_stress(const Vector<double>& s,
+				     double& sigma_r_r,
+				     double& sigma_phi_phi) const;
 
 
     /// Self-test: Return 0 for OK
@@ -372,6 +411,9 @@ namespace oomph
 
     /// Pointer to pressure function:
     AxisymFoepplvonKarmanPressureFctPt Pressure_fct_pt;
+
+    /// Pointer to pressure function:
+    AxisymFoepplvonKarmanPrestressFctPt Prestress_fct_pt;
 
     /// Pointer to Poisson's ratio
     double* Nu_pt;

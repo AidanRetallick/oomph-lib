@@ -121,9 +121,13 @@ namespace oomph
       double pressure = 0.0;
       get_pressure_fvk(ipt, interpolated_r, pressure);
 
+      // Get prestress function
+      //---------------------
+      double prestress = 0.0;
+      get_prestress_fvk(ipt, interpolated_r, prestress);
+
       // Determine the stresses
       //-----------------------
-
       double sigma_r_r = 0.0;
       double sigma_phi_phi = 0.0;
 
@@ -144,11 +148,13 @@ namespace oomph
       {
         sigma_r_r = 1.0 / (1.0 - nu_local * nu_local) *
                     (interpolated_du_rdr +
-                     nu_local * 1.0 / interpolated_r * interpolated_u_r);
+                     nu_local * 1.0 / interpolated_r * interpolated_u_r)
+                    + prestress;
 
         sigma_phi_phi = 1.0 / (1.0 - nu_local * nu_local) *
                         (1.0 / interpolated_r * interpolated_u_r +
-                         nu_local * interpolated_du_rdr);
+                         nu_local * interpolated_du_rdr)
+                    + prestress;
       }
 
 
