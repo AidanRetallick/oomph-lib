@@ -12,6 +12,7 @@ fourier_decomposed_helmholtz\
 foeppl_von_karman \
 axisym_foeppl_von_karman \
 c1_foeppl_von_karman \
+c1_koiter_steigmann \
 pml_helmholtz \
 axisym_linear_elasticity \
 pml_fourier_decomposed_helmholtz \

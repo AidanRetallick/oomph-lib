@@ -35,6 +35,11 @@ namespace oomph
     /// in-of-plane forcing, anisotropic-prestrain, etc.
     typedef void (*VectorFctPt)(const Vector<double>& x, Vector<double>& f);
 
+    /// \short Function pointer to prestress function  e_0(x) --
+    /// x is a Vector!
+    typedef void (*PrestrainFctPt)(const Vector<double>& x,
+                                   DenseMatrix<double>& prestrain);
+
     /// \short Function pointer to pressure function fct(x,f(x)) --
     /// x is a Vector!
     // typedef void (*PressureFctPt)(const Vector<double>& x, double& f);
@@ -104,10 +109,12 @@ namespace oomph
     /// Constructor
     KoiterSteigmannEquations()
       : Use_finite_difference_jacobian(false),
+	Ui_is_damped{false,false,false},
 	Pressure_fct_pt(0),
         D_pressure_dr_fct_pt(0),
         D_pressure_dn_fct_pt(0),
         D_pressure_d_grad_u_fct_pt(0),
+	Prestrain_fct_pt(0),
         Stress_fct_pt(0),
         D_stress_fct_pt(0),
         Error_metric_fct_pt(0),
@@ -115,6 +122,7 @@ namespace oomph
     {
       // Poisson ratio is 0.5 (incompressible) by default.
       Nu_pt = &Default_Nu_Value;
+      Mu_pt = &Default_Mu_Value;
       Eta_u_pt = &Default_Eta_Value;
       Eta_sigma_pt = &Default_Eta_Value;
 
@@ -710,6 +718,27 @@ difference stress is not yet defined so an error has been thrown.",
       }
     }
 
+
+    /// Get the (Green Lagrange) strain tensor and add a prestrain
+    inline void fill_in_strain_tensor(
+      const DenseMatrix<double>& interpolated_dudxi,
+      const DenseMatrix<double>& prestrain,
+      DenseMatrix<double>& strain)
+    {
+      // Fill in the strain as usual
+      fill_in_strain_tensor(interpolated_dudxi, strain);
+
+      // Add the prestrain contributions
+      for (unsigned alpha = 0; alpha < 2; ++alpha)
+      {
+        for (unsigned beta = 0; beta < 2; ++beta)
+        {
+          strain(alpha, beta) += prestrain(alpha,beta);
+        }
+      }
+    }
+
+
     // Get the (Green Lagrange) strain tensor
     inline void fill_in_strain_tensor(
       const DenseMatrix<double>& interpolated_dudxi,
@@ -1013,9 +1042,9 @@ difference stress is not yet defined so an error has been thrown.",
       for (unsigned i = 0; i < this->Number_of_displacements; ++i)
       {
         // Loop over inplane components
-        for (unsigned gamma = 0; gamma < 2; ++gamma)
+        for (unsigned alpha = 0; alpha < 2; ++alpha)
         {
-          tension_vectors(i, gamma) = 0.0;
+          tension_vectors(i, alpha) = 0.0;
         }
       }
 
@@ -1024,7 +1053,7 @@ difference stress is not yet defined so an error has been thrown.",
       for (unsigned i = 0; i < this->Number_of_displacements; ++i)
       {
         // Loop over inplane components
-        for (unsigned gamma = 0; gamma < 2; ++gamma)
+        for (unsigned alpha = 0; alpha < 2; ++alpha)
         {
           // Loop over inplane components
           for (unsigned beta = 0; beta < 2; ++beta)
@@ -1035,16 +1064,16 @@ difference stress is not yet defined so an error has been thrown.",
             const double eta_u = this->eta_u();
             const double eta_sigma = this->eta_sigma();
             // The diagonal parts of the tangent matrix
-            tension_vectors(i, gamma) +=
+            tension_vectors(i, alpha) +=
               (delta_ibeta + eta_u * interpolated_dudxi(i, beta)) * eta_sigma *
-              stress(gamma, beta);
+              stress(alpha, beta);
 
-            for (unsigned alpha = 0; alpha < 2; ++alpha)
+            for (unsigned gamma = 0; gamma < 2; ++gamma)
             {
               // Shouldn't this be -M_{i \al \be} \Ga^\ga_{\al \be} ?
-              tension_vectors(i, gamma) -=
-                eta_u * moment_tensors(i, alpha, beta) *
-                christoffel_tensor(gamma, alpha, beta);
+              tension_vectors(i, alpha) -=
+                eta_u * moment_tensors(i, beta, gamma) *
+                christoffel_tensor(alpha, beta, gamma);
             }
           }
         }
@@ -1287,6 +1316,62 @@ difference stress is not yet defined so an error has been thrown.",
     //----------------------------------------------------------------------
     // Control parameters/forcing
 
+    /// Enable damping in all displacements
+    inline void enable_damping()
+    {
+      Ui_is_damped[0] = true;
+      Ui_is_damped[1] = true;
+      Ui_is_damped[2] = true;
+    }
+
+    /// Enable damping in the i-th displacement
+    inline void enable_damping(const unsigned i_field)
+    {
+      // [zdec] Range checking?
+      Ui_is_damped[i_field] = true;
+    }
+
+    /// Disable damping in all displacements
+    inline void disable_damping()
+    {
+      Ui_is_damped[0] = false;
+      Ui_is_damped[1] = false;
+      Ui_is_damped[2] = false;
+    }
+
+    /// Disable damping in the i-th displacement
+    inline void disable_damping(const unsigned i_field)
+    {
+      // [zdec] Range checking?
+      Ui_is_damped[i_field] = false;
+    }
+
+    /// Get prestrain at (Eulerian) position x. This function is virtual to
+    /// allow overloading in multi-physics problems where the strength of the
+    /// prestrain function might be determined by another system of equations.
+    inline virtual void get_prestrain(const unsigned& ipt,
+				      const Vector<double>& x,
+				      DenseMatrix<double>& prestrain) const
+    {
+      // Dimension of the plate
+      unsigned dim = this->dim();
+
+      // If no prestrain function has been set, return zero
+      // Zero the pressure (as a precaution)
+      for (unsigned alpha = 0; alpha < dim; ++alpha)
+      {
+	for (unsigned beta = 0; beta < dim; ++beta)
+	{
+	  prestrain(alpha, beta) = 0.0;
+	}
+      }
+      if (Prestrain_fct_pt != 0)
+      {
+        // Get prestrain strength
+        (*Prestrain_fct_pt)(x, prestrain);
+      }
+    }
+
     /// Get pressure term at (Eulerian) position x. This function is
     /// virtual to allow overloading in multi-physics problems where
     /// the strength of the pressure function might be determined by
@@ -1522,6 +1607,12 @@ difference stress is not yet defined so an error has been thrown.",
       return Pressure_fct_pt;
     }
 
+    /// Access function: Pointer to prestrain function
+    inline PrestrainFctPt& prestrain_fct_pt()
+    {
+      return Prestrain_fct_pt;
+    }
+
     /// Access function: Pointer to pressure function
     inline DPressureVectorFctPt& d_pressure_dn_fct_pt()
     {
@@ -1612,16 +1703,10 @@ difference stress is not yet defined so an error has been thrown.",
       return Multiple_error_metric_fct_pt;
     }
 
-    /// Access function to the Poisson ratio.
+    /// Access function to the Poisson ratio pointer.
     inline const double*& nu_pt()
     {
       return Nu_pt;
-    }
-
-    /// Access function to the Poisson ratio.
-    inline const double*& thickness_pt()
-    {
-      return Thickness_pt;
     }
 
     /// Access function to the Poisson ratio (const version)
@@ -1630,7 +1715,25 @@ difference stress is not yet defined so an error has been thrown.",
       return *Nu_pt;
     }
 
-    /// Access function to the Poisson ratio (const version)
+    /// Access function to the coefficient of damping pointer
+    inline const double*& mu_pt()
+    {
+      return Mu_pt;
+    }
+
+    /// Access function to the coefficient of damping
+    inline const double& get_mu()
+    {
+      return *Mu_pt;
+    }
+
+    /// Access function to the thickness pointer.
+    inline const double*& thickness_pt()
+    {
+      return Thickness_pt;
+    }
+
+    /// Access function to the thickness
     inline const double& get_thickness() const
     {
       return *Thickness_pt;
@@ -1660,109 +1763,6 @@ difference stress is not yet defined so an error has been thrown.",
     {
       return *Eta_sigma_pt;
     }
-
-    // // Get the kth dof type at internal point l
-    // virtual double get_u_bubble_dof(const unsigned& l,
-    //                                 const unsigned& k) const = 0;
-
-    // // Get the kth equation at internal point l
-    // virtual int local_u_bubble_equation(const unsigned& l,
-    //                                     const unsigned& k) const = 0;
-
-    // // Get the number of basis functions, pure virtual
-    // virtual double n_basis_functions() = 0;
-    // // Get the number of basic basis functions, pure virtual
-    // virtual double n_basic_basis_functions() = 0;
-
-    // /// \short Output exact soln: x,y,u_exact or x,y,z,u_exact at
-    // /// n_plot^DIM plot points (dummy time-dependent version to
-    // /// keep intel compiler happy)
-    // virtual void output_fct(std::ostream &outfile, const unsigned &n_plot,
-    //                         const double& time,
-    //                         FiniteElement::UnsteadyExactSolutionFctPt
-    //                         exact_soln_pt)
-    //  {
-    //   throw OomphLibError(
-    //    "There is no time-dependent output_fct() for these elements ",
-    //    OOMPH_CURRENT_FUNCTION, OOMPH_EXCEPTION_LOCATION);
-    //  }
-
-    // void pin_all_in_plane_dofs()
-    // {
-    //   double n_displacements = Number_of_displacements;
-    //   unsigned n_u_nodal_type = this->nu_type_at_each_node();
-    //   // Pin the nodal dofs
-    //   for (unsigned inode = 0; inode < this->nnode(); ++inode)
-    //   {
-    //     Node* nod_pt = this->node_pt(inode);
-    //     for (unsigned k = 0; k < n_u_nodal_type; ++k)
-    //     {
-    //       for (unsigned j = 0; j < n_displacements - 1; ++j)
-    //       {
-    //         // Pin kth value and set to zero
-    //         nod_pt->pin(u_index_koiter_model(k, j));
-    //         nod_pt->set_value(u_index_koiter_model(k, j), 0.0);
-    //       }
-    //     }
-    //   }
-    //   // Pin the internal dofs
-    //   const double n_internal_dofs = this->Number_of_internal_dofs;
-    //   for (unsigned i = 0; i < n_internal_dofs; ++i)
-    //   {
-    //     for (unsigned j = 0; j < n_displacements - 1; ++j)
-    //     {
-    //       Data* internal_data_pt = this->internal_data_pt(1);
-    //       // Pin kth value and set to zero
-    //       internal_data_pt->pin(i + j * n_internal_dofs);
-    //       // HERE need a function that can give us this lookup
-    //       internal_data_pt->set_value(i + j * n_internal_dofs, 0.0);
-    //     }
-    //   }
-    // }
-
-    // void pin_out_of_plane_dofs()
-    // {
-    //   double n_displacements = Number_of_displacements;
-    //   unsigned n_u_nodal_type = this->nu_type_at_each_node();
-    //   // Pin the nodal dofs
-    //   for (unsigned inode = 0; inode < this->nnode(); ++inode)
-    //   {
-    //     Node* nod_pt = this->node_pt(inode);
-    //     for (unsigned k = 0; k < n_u_nodal_type; ++k)
-    //     {
-    //       for (unsigned j = n_displacements - 1; j < n_displacements; ++j)
-    //       {
-    //         // Pin kth value and set to zero
-    //         nod_pt->pin(u_index_koiter_model(k, j));
-    //         nod_pt->set_value(u_index_koiter_model(k, j), 0.0);
-    //       }
-    //     }
-    //   }
-    //   // Pin the internal dofs
-    //   const double n_internal_dofs = this->Number_of_internal_dofs;
-    //   for (unsigned i = 0; i < n_internal_dofs; ++i)
-    //   {
-    //     for (unsigned j = n_displacements - 1; j < n_displacements; ++j)
-    //     {
-    //       Data* internal_data_pt = this->internal_data_pt(1);
-    //       // Pin kth value and set to zero
-    //       internal_data_pt->pin(i + j * n_internal_dofs);
-    //       // HERE need a function that can give us this lookup
-    //       internal_data_pt->set_value(i + j * n_internal_dofs, 0.0);
-    //     }
-    //   }
-    // }
-
-
-    // /// \short get the coordinate
-    // virtual void get_coordinate_x(const Vector<double>& s,
-    //                               Vector<double>& x) const = 0;
-
-    /// \short HERE eta_u is untested feature so we have disabled it until we
-    /// have validated it
-    //  ///Access function to the z displacement scaling in the displacement.
-    //  virtual const double*& eta_u_pt() {return Eta_u_pt;}
-
 
 
 
@@ -1827,7 +1827,7 @@ difference stress is not yet defined so an error has been thrown.",
     /// (pure virtual) interface to retrieve the t-th history value of u_alpha
     /// of internal type k
     virtual double get_u_i_internal_value_of_type(
-      const unsigned& time,
+      const unsigned& t_time,
       const unsigned& i_field,
       const unsigned& k_type) const = 0;
 
@@ -1890,9 +1890,7 @@ difference stress is not yet defined so an error has been thrown.",
     // End of pure virtual interface functions
     //----------------------------------------------------------------------------
 
-
-
-    /// \short Compute element residual Vector only (if flag=and/or element
+    /// Compute element residual Vector only (if flag=and/or element
     /// Jacobian matrix
     virtual void fill_in_generic_residual_contribution_koiter_steigmann(
       Vector<double>& residuals,
@@ -1906,6 +1904,9 @@ difference stress is not yet defined so an error has been thrown.",
     /// Flag to use finite difference jacobian
     bool Use_finite_difference_jacobian;
 
+    /// Flags to determine which displacement fields are damped
+    bool Ui_is_damped[3];
+
     /// Pointer to pressure function:
     PressureVectorFctPt Pressure_fct_pt;
 
@@ -1918,6 +1919,9 @@ difference stress is not yet defined so an error has been thrown.",
     /// Pointer to pressure function:
     DPressureVectorDMatrixFctPt D_pressure_d_grad_u_fct_pt;
 
+    /// Pointer to prestrain function:
+    PrestrainFctPt Prestrain_fct_pt;
+
     /// Pointer to stress function
     StressFctPt Stress_fct_pt;
 
@@ -1926,6 +1930,9 @@ difference stress is not yet defined so an error has been thrown.",
 
     /// Pointer to Poisson ratio, which this element cannot modify
     const double* Nu_pt;
+
+    /// Pointer to Mu, the damping coefficient
+    const double* Mu_pt;
 
     /// Pointer to Non dimensional thickness parameter
     const double* Thickness_pt;
@@ -1942,16 +1949,6 @@ difference stress is not yet defined so an error has been thrown.",
     /// Pointer to error metric when we want multiple errors
     MultipleErrorMetricFctPt Multiple_error_metric_fct_pt;
 
-    // /// \short unsigned that holds the internal 'bubble' dofs the element has -
-    // // zero for Bell Elements and 3 for C1 curved elements
-    // unsigned Number_of_internal_dofs;
-
-    // /// \short unsigned that holds the number of types of degree of freedom at
-    // /// each
-    // // internal point that the element has zero for Bell Elements and 1
-    // //// for C1 curved elements
-    // unsigned Number_of_internal_dof_types;
-
     /// unsigned that holds the number if displacments the element has
     static const unsigned Number_of_displacements;
 
@@ -1959,12 +1956,13 @@ difference stress is not yet defined so an error has been thrown.",
     static const double Default_Nu_Value;
 
     /// Default value of Eta incase not user set
-    static const double Default_Eta_Value; // HERE MOVE
+    static const double Default_Eta_Value;
+
+    /// Default value of Mu incase not user set
+    static const double Default_Mu_Value;
 
     /// Default value of Thickness incase not user set
     static const double Default_Thickness_Value;
-
-
   };
 
 } // end namespace oomph
