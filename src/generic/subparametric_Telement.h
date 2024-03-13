@@ -487,6 +487,12 @@ to access interpolated eulerian coordinate",
     }
 
 
+    /// Unhide the original local-to-eulerian mapping (not because I am planning
+    /// to use it, but hiding it with an override causes a bunch of ridiculous
+    /// warnings about hiding it by accident)
+    using TElement<2, NNODE_1D>::local_to_eulerian_mapping;
+
+
     /// Local_to_eulerian mapping with local coordinate argument: when upgraded
     /// this uses the Bernadou implementation of the Jacobian
     virtual double local_to_eulerian_mapping(
