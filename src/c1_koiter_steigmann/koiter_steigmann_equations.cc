@@ -191,17 +191,17 @@ namespace oomph
       //-----------------------------------------
       for (unsigned i_field = 0; i_field < n_displacements; i_field++)
       {
-	// Reset interpolated values
-	interpolated_u[i_field] = 0.0;
-	interpolated_dudt[i_field] = 0.0;
-	for(unsigned alpha = 0; alpha < n_deriv; alpha++)
-	{
-	  interpolated_dudxi(i_field, alpha) = 0.0;
-	}
-	for(unsigned alphabeta = 0; alphabeta < n_2deriv; alphabeta++)
-	{
-	  interpolated_d2udxi2(i_field, alphabeta) = 0.0;
-	}
+        // Reset interpolated values
+        interpolated_u[i_field] = 0.0;
+        interpolated_dudt[i_field] = 0.0;
+        for(unsigned alpha = 0; alpha < n_deriv; alpha++)
+        {
+          interpolated_dudxi(i_field, alpha) = 0.0;
+        }
+        for(unsigned alphabeta = 0; alphabeta < n_2deriv; alphabeta++)
+        {
+          interpolated_d2udxi2(i_field, alphabeta) = 0.0;
+        }
 
         // Loop over nodes
         for (unsigned j_node = 0; j_node < n_u_node; j_node++)
