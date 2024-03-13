@@ -652,12 +652,6 @@ namespace oomph
       return Nfield;
     }
 
-    /// Access the status of the interpolation of each field
-    std::vector<bool> field_is_bell_interpolated()
-    {
-      return Field_is_bell_interpolated;
-    }
-
     /// Required  # of `values' (pinned or dofs)
     /// at node n
     inline unsigned required_nvalue(const unsigned& n) const
@@ -1248,7 +1242,7 @@ namespace oomph
 
 
   //======================================================================
-  /// (pure virtual) Out-of-plane basis functions at local coordinate s
+  /// Out-of-plane basis functions at local coordinate s
   //======================================================================
   template<unsigned NNODE_1D>
   void FoepplVonKarmanC1CurvableBellElement<
@@ -1256,10 +1250,10 @@ namespace oomph
                                          Shape& psi_n,
                                          Shape& psi_i) const
   {
-    throw OomphLibError("This still needs testing for curved elements.",
-                        "void FoepplVonKarmanC1CurvableBellElement<NNODE_1D>::\
-shape_and_test_foeppl_von_karman(...)",
-                        OOMPH_EXCEPTION_LOCATION);
+//     throw OomphLibError("This still needs testing for curved elements.",
+//                         "void FoepplVonKarmanC1CurvableBellElement<NNODE_1D>::\
+// shape_and_test_foeppl_von_karman(...)",
+//                         OOMPH_EXCEPTION_LOCATION);
 
     this->c1_basis(s, psi_n, psi_i);
 
@@ -2875,7 +2869,7 @@ of freedom at internal points. They are {w ; w,x ; w,y ; w,xx ; w,xy ; w,yy}",
     /// linearly dependent. (We choose this to be slightly larger than machine
     /// precision and it shouldn't generally need to be touched)
     double Orthogonality_tolerance = 1.0e-15;
-  };
+  }; // End of DuplicateNodeConstraintElement class definition
 
 
 } // namespace oomph

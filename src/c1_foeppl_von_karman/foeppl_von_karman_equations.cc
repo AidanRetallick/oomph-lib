@@ -717,11 +717,17 @@ namespace oomph
                   // If at a non-zero degree of freedom add in the entry
                   if (local_unknown >= 0)
                   {
-                    // Contribution from damping
-                    jacobian(local_eqn, local_unknown) +=
-                      mu * psi_n_w(j_node2, k_type2) *
-                      node_pt(j_node2)->time_stepper_pt()->weight(1, 0) *
-                      test_n_w(j_node, k_type) * W;
+		    // If damping is on at this node, add contribution
+		    TimeStepper* timestepper_pt =
+		      this->node_pt(j_node2)->time_stepper_pt();
+		    bool damped = W_is_damped && !(timestepper_pt->is_steady());
+		    if(damped)
+		    {
+		      jacobian(local_eqn, local_unknown) +=
+		      mu * psi_n_w(j_node2, k_type2) *
+		      timestepper_pt->weight(1, 0) *
+		      test_n_w(j_node, k_type) * W;
+		    }
                     // Loop over dimensions
                     for (unsigned alpha = 0; alpha < 2; ++alpha)
                     {
@@ -777,11 +783,18 @@ namespace oomph
                 // If at a non-zero degree of freedom add in the entry
                 if (local_unknown >= 0)
                 {
-                  // Contribution from buckle stabilising drag
-                  jacobian(local_eqn, local_unknown) +=
-                    psi_i_w(k_type2) *
-                    w_internal_data_pt()->time_stepper_pt()->weight(1, 0) * mu *
-                    test_n_w(j_node, k_type) * W;
+		  // If damping is on at this internal data, add contribution
+		  TimeStepper* timestepper_pt =
+		    this->internal_data_pt(k_type2)->time_stepper_pt();
+		  bool damped = W_is_damped && !(timestepper_pt->is_steady());
+		  if(damped)
+		  {
+		    // Contribution from buckle stabilising drag
+		    jacobian(local_eqn, local_unknown) +=
+		      psi_i_w(k_type2) *
+		      timestepper_pt->weight(1, 0) *
+		      mu * test_n_w(j_node, k_type) * W;
+		  }
                   // Loop over dimensions
                   for (unsigned alpha = 0; alpha < 2; ++alpha)
                   {
@@ -939,11 +952,17 @@ namespace oomph
                 // If at a non-zero degree of freedom add in the entry
                 if (local_unknown >= 0)
                 {
-                  // Contribution from buckle stabilising drag
-                  jacobian(local_eqn, local_unknown) +=
-                    mu * psi_n_w(j_node2, k_type2) *
-                    node_pt(j_node2)->time_stepper_pt()->weight(1, 0) *
-                    test_i_w(k_type) * W;
+		  // If damping is on at this node, add contribution
+		  TimeStepper* timestepper_pt =
+		    this->node_pt(j_node2)->time_stepper_pt();
+		  bool damped = W_is_damped && !(timestepper_pt->is_steady());
+		  if(damped)
+		  {
+		    jacobian(local_eqn, local_unknown) +=
+		      mu * psi_n_w(j_node2, k_type2) *
+		      timestepper_pt->weight(1, 0) *
+		      test_i_w(k_type) * W;
+		  }
                   // Loop over dimensions
                   for (unsigned alpha = 0; alpha < 2; ++alpha)
                   {
@@ -998,11 +1017,18 @@ namespace oomph
               // If at a non-zero degree of freedom add in the entry
               if (local_unknown >= 0)
               {
-                // Contribution from buckle stabilising drag
-                jacobian(local_eqn, local_unknown) +=
-                  mu * psi_i_w(k_type2) *
-                  w_internal_data_pt()->time_stepper_pt()->weight(1, 0) *
-                  test_i_w(k_type) * W;
+		// If damping is on at this internal data, add contribution
+		TimeStepper* timestepper_pt =
+		  this->internal_data_pt(k_type2)->time_stepper_pt();
+		bool damped = W_is_damped && !(timestepper_pt->is_steady());
+		if(damped)
+		{
+		  // Contribution from buckle stabilising drag
+		  jacobian(local_eqn, local_unknown) +=
+		    psi_i_w(k_type2) *
+		    timestepper_pt->weight(1, 0) *
+		    mu * test_i_w(k_type) * W;
+		}
                 // Loop over dimensions
                 for (unsigned alpha = 0; alpha < 2; alpha++)
                 {
