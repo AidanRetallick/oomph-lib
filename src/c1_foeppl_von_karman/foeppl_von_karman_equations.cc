@@ -1580,6 +1580,105 @@ namespace oomph
   } // End of output_fct(...)
 
 
+
+
+//======================================================================
+ /// Output: x, y, sigma_xx, sigma_xy, sigma_yy,
+ ///         (sigma_1, sigma_2, sigma_1x, sigma1y, sigma2x, sigma2y)
+ ///                                   (if principal_stresses==true)
+ /// at the Gauss integration points to obtain a smooth point
+ /// cloud (stress may be discontinuous across elements in general)
+//======================================================================
+void DampedFoepplVonKarmanEquations::output_smooth_stress(std::ostream &outfile,
+							  const bool &principal_stresses)
+ {
+  unsigned dim = this->dim();
+
+  // Vector of local coordinates
+  Vector<double> s(dim);
+  // Vector of global coordinates
+  Vector<double> x(dim);
+
+  // Storage for variables
+  double c_swell(0.0);
+  double epsilon_0(0.0);
+  Vector<double> u;
+  DenseMatrix<double> interpolated_dwdxj(1,dim,0.0);
+  DenseMatrix<double> interpolated_duidxj(2,dim,0.0);
+  DenseMatrix<double> sigma(2,2,0.0);
+  Vector<double> sigma_eigenvals(2,0.0);
+  DenseMatrix<double> sigma_eigenvecs(2,2,0.0);
+
+  // The number of plot points is the number of integration (Gauss) points
+  unsigned num_plot_points=this->integral_pt()->nweight();
+
+  double iplot=0;
+  
+  // Loop over the plot points
+  for(unsigned iplot=0; iplot<num_plot_points; iplot++)
+   {
+    // Get the local and global coordinates of the plot point
+    s[0] = this->integral_pt()->knot(iplot,0);
+    s[1] = this->integral_pt()->knot(iplot,1);
+    //s[0] = 0.5;
+    //s[1] = 0.5;
+    interpolated_x(s,x);
+    
+      // Get interpolated unknowns
+   u = interpolated_u_foeppl_von_karman(s);
+
+   // Get prestrain and degree of swelling for use in the strain tensor
+   this->get_swelling_foeppl_von_karman(iplot,x,c_swell);
+   this->get_prestrain(iplot,x,epsilon_0);
+   
+   // Copy gradients from u into interpolated gradient matrices...
+   interpolated_dwdxj(0,0) = u[1]; //dwdx1
+   interpolated_dwdxj(0,1) = u[2]; //dwdx2
+   interpolated_duidxj(0,0)= u[8]; //du1dx1
+   interpolated_duidxj(0,1)= u[9]; //du1dx2
+   interpolated_duidxj(1,0)= u[10]; //du2dx1
+   interpolated_duidxj(1,1)= u[11]; //du2dx2
+
+   DenseMatrix<double> epsilon(2,2,0.0);
+   get_epsilon(epsilon, interpolated_duidxj,interpolated_dwdxj,
+	       c_swell, epsilon_0);
+
+   // Use epsilon to find the stress sigma.
+   get_sigma_from_epsilon(sigma, epsilon);
+
+   // Output the global coordinates of the plot point
+   for(unsigned i=0;i<this->dim();i++)
+    {
+     outfile << x[i] << " ";
+    }
+   
+   // Output axial stresses [zdec] here also w for debugging
+   outfile << sigma(0,0) << " " << sigma(0,1) << " " << sigma(1,1) << " ";
+   
+   // If we want the principal stresses, calculate them and add them to the
+   // output
+   if(principal_stresses)
+    {
+     // Get the principal values and the corresponding directions of stress.
+     get_principal_stresses(sigma, sigma_eigenvals, sigma_eigenvecs);
+     
+     // Output principal stress magnitudes
+     outfile << sigma_eigenvals[0] << " " << sigma_eigenvals[1] << " ";
+     
+     // Output principal stress directions
+     outfile << sigma_eigenvecs(0,0) << " " << sigma_eigenvecs(1,0) << " "
+	     << sigma_eigenvecs(0,1) << " " << sigma_eigenvecs(1,1) << " ";
+    }
+   
+   // End output line
+   outfile << std::endl;
+  }
+ }
+
+
+
+
+
   //======================================================================
   /// Validate against exact solution
   ///
