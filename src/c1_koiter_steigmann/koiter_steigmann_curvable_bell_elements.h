@@ -105,8 +105,7 @@ namespace oomph
         DenseMatrix<double> jac_inv(2, 2, 0.0);
         // Hessian of mapping [zdec] (not needed because...)
         Vector<DenseMatrix<double>> hess(2, DenseMatrix<double>(2, 2, 0.0));
-        // Hessian of inverse mapping [zdec] (...this can be found by
-        // hand)
+        // Hessian of inverse mapping [zdec] (...this can be found by hand)
         Vector<DenseMatrix<double>> hess_inv(2, DenseMatrix<double>(2, 2, 0.0));
 
         // The basis is defined in terms of the boundary parametrisation
@@ -192,51 +191,6 @@ namespace oomph
 
         // Fill in the rotation matrix using the new basis
         fill_in_rotation_matrix_at_node_with_basis(j_node, jac_inv, hess_inv);
-
-
-        // // [zdec] debug
-        // std::ofstream jac_and_hess;
-        // jac_and_hess.open("jac_and_hess_new.csv", std::ios_base::app);
-        // jac_and_hess << "Jacobian inverse:" << std::endl
-        //                 << bi[0][0] << " " << bi[0][1] << std::endl
-        //                 << bi[1][0] << " " << bi[1][1] << std::endl
-        //                 << "Hessian inverse [x]:" << std::endl
-        //                 << Dbi[0](0,0) << " " << Dbi[0](0,1) << std::endl
-        //                 << Dbi[0](1,0) << " " << Dbi[0](1,1) << std::endl
-        //                 << "Hessian inverse [y]:" << std::endl
-        //                 << Dbi[1](0,0) << " " << Dbi[1](0,1) << std::endl
-        //                 << Dbi[1](1,0) << " " << Dbi[1](1,1) << std::endl <<
-        // std::endl;
-
-
-        // // [zdec] debug
-        // std::ofstream jac_and_hess;
-        // jac_and_hess.open("jac_and_hess_new.csv", std::ios_base::app);
-        // jac_and_hess << "Jacobian inverse:" << std::endl
-        //              << jac_inv(0, 0) << " " << jac_inv(0, 1) << std::endl
-        //              << jac_inv(1, 0) << " " << jac_inv(1, 1) << std::endl
-        //              << "Hessian inverse [x]:" << std::endl
-        //              << hess_inv[0](0, 0) << " " << hess_inv[0](0, 1)
-        //              << std::endl
-        //              << hess_inv[0](1, 0) << " " << hess_inv[0](1, 1)
-        //              << std::endl
-        //              << "Hessian inverse [y]:" << std::endl
-        //              << hess_inv[1](0, 0) << " " << hess_inv[1](0, 1)
-        //              << std::endl
-        //              << hess_inv[1](1, 0) << " " << hess_inv[1](1, 1)
-        //              << std::endl
-        //              << std::endl;
-        // jac_and_hess.close();
-
-        // // [zdec] debug
-        // std::ofstream debug_stream;
-        // debug_stream.open("norm_and_tan.dat", std::ios_base::app);
-        // debug_stream << x[0] << " " << x[1] << " " << ni[0] << " " << ni[1]
-        //              << " " << ti[0] << " " << ti[1] << " " << dnids[0] << "
-        //              "
-        //              << dnids[1] << " " << dtids[0] << " " << dtids[1] << " "
-        //              << d2xids2[0] << " " << d2xids2[1] << std::endl;
-        // debug_stream.close();
 
       } // end loop over vertices
     } // end of update_rotation_matrices()

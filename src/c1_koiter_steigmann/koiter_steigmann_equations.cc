@@ -19,7 +19,7 @@ namespace oomph
   /// Default plate thickness
   const double KoiterSteigmannEquations::Default_Thickness_Value = 0.01;
 
-  // Output to mathematica
+  /// Output to mathematica
   template<typename T>
   void output_mathematica(std::ostream& outfile,
                           const RankThreeTensor<T>& tensor)
