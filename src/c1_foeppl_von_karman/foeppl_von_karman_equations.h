@@ -38,6 +38,7 @@
 #include "../generic/nodes.h"
 #include "../generic/oomph_utilities.h"
 #include "../generic/Telements.h"
+#include "../generic/error_estimator.h"
 
 // [zdec] TODO:
 // -- Move function definitions to .cc
@@ -68,7 +69,8 @@ namespace oomph
   /// field has been written with the possibility of internal data in mind,
   /// however this can easily be added for in-plane dofs if required.
   //=============================================================================
-  class FoepplVonKarmanEquations : public virtual FiniteElement
+  class FoepplVonKarmanEquations
+    : public virtual ElementWithZ2ErrorEstimator
   {
   public:
 
@@ -108,7 +110,8 @@ namespace oomph
 
     /// Constructor
     FoepplVonKarmanEquations()
-      : Solve_u_exact(false),
+      : ElementWithZ2ErrorEstimator(),
+	Solve_u_exact(false),
 	Pressure_fct_pt(0),
         In_plane_forcing_fct_pt(0),
         Swelling_fct_pt(0),
@@ -378,6 +381,77 @@ namespace oomph
     }
 
 
+    /// Get 'flux' for Z2 error recovery:   Upper triangular entries
+    /// in stress tensor.
+    void get_Z2_flux(const Vector<double>& s, Vector<double>& flux)
+    {
+      unsigned dim = this->dim();
+      #ifdef PARANOID
+      unsigned num_entries = num_Z2_flux_terms();
+      if (flux.size() != num_entries)
+      {
+	std::ostringstream error_message;
+	error_message << "The flux vector has the wrong number of entries, "
+		      << flux.size() << ", whereas it should be " << num_entries
+		      << std::endl;
+	throw OomphLibError(error_message.str(),
+			    OOMPH_CURRENT_FUNCTION,
+			    OOMPH_EXCEPTION_LOCATION);
+      }
+      #endif
+
+      // Interpolate unknowns to get the displacement gradients
+      Vector<double> u = interpolated_fvk_disp(s);
+      DenseMatrix<double> duidxj(dim, dim);
+      DenseMatrix<double> dwdxi(1, dim);
+      // Copy out gradient entries to the containers to pass to get_sigma
+      // [zdec] dont hard code this
+      duidxj(0, 0) = u[8];
+      duidxj(0, 1) = u[9];
+      duidxj(1, 0) = u[10];
+      duidxj(1, 1) = u[11];
+      dwdxi(0, 0) = u[1];
+      dwdxi(0, 1) = u[2];
+
+      // Get prestrain in terms of global coordinates
+      Vector<double> x(2,0.0);
+      interpolated_x(s, x);
+      double c_swell = 0.0;
+      this->get_swelling_foeppl_von_karman(x, c_swell);
+
+      // Get stress matrix
+      DenseMatrix<double> sigma(dim);
+      this->get_sigma(sigma, duidxj, dwdxi, c_swell);
+
+      // Pack into flux Vector
+      unsigned icount = 0;
+
+      // Start with diagonal terms
+      for (unsigned i = 0; i < dim; i++)
+      {
+        flux[icount] = sigma(i, i);
+        icount++;
+      }
+
+      // Off diagonals row by row
+      for (unsigned i = 0; i < dim; i++)
+      {
+        for (unsigned j = i + 1; j < dim; j++)
+        {
+          flux[icount] = sigma(i, j);
+          icount++;
+        }
+      }
+    }
+
+
+    /// Order of recovery shape functions for Z2 error estimation:
+    /// Cubic.
+    unsigned nrecovery_order()
+    {
+      return 3;
+    }
+
     //----------------------------------------------------------------------
     // Control parameters/forcing
 
@@ -385,19 +459,18 @@ namespace oomph
     /// virtual to allow overloading in multi-physics problems where
     /// the strength of the pressure function might be determined by
     /// another system of equations.
-    inline virtual void get_pressure_foeppl_von_karman(const unsigned& ipt,
-                                                       const Vector<double>& x,
-                                                       double& pressure) const
+    inline virtual void get_pressure_foeppl_von_karman(
+      const unsigned& ipt, const Vector<double>& x, double& pressure) const
     {
       // If no pressure function has been set, return zero
       if (Pressure_fct_pt == 0)
       {
-        pressure = 0.0;
+	pressure = 0.0;
       }
       else
       {
-        // Get pressure strength
-        (*Pressure_fct_pt)(x, pressure);
+	// Get pressure strength
+	(*Pressure_fct_pt)(x, pressure);
       }
     }
 
@@ -406,40 +479,39 @@ namespace oomph
     /// the strength of the pressure function might be determined by
     /// another system of equations.
     inline virtual void get_in_plane_forcing_foeppl_von_karman(
-      const unsigned& ipt,
-      const Vector<double>& x,
-      Vector<double>& traction) const
+      const unsigned& ipt, const Vector<double>& x, Vector<double>& traction)
+      const
     {
       // In plane is same as DIM of problem (2)
       traction.resize(this->dim());
       // If no pressure function has been set, return zero
       if (In_plane_forcing_fct_pt == 0)
       {
-        traction[0] = 0.0;
-        traction[1] = 0.0;
+	traction[0] = 0.0;
+	traction[1] = 0.0;
       }
       else
       {
-        // Get pressure strength
-        (*In_plane_forcing_fct_pt)(x, traction);
+	// Get pressure strength
+	(*In_plane_forcing_fct_pt)(x, traction);
       }
     }
 
 
     /// Get swelling at (Eulerian) position x. This function is
     /// virtual to allow overloading. [zdec] add ipt
-    inline virtual void get_swelling_foeppl_von_karman(const Vector<double>& x,
-                                                       double& swelling) const
+    inline virtual void get_swelling_foeppl_von_karman(
+      const Vector<double>& x, double& swelling) const
     {
       // If no swelling function has been set, return zero
       if (Swelling_fct_pt == 0)
       {
-        swelling = 0.0;
+	swelling = 0.0;
       }
       else
       {
-        // Get swelling magnitude
-        (*Swelling_fct_pt)(x, swelling);
+	// Get swelling magnitude
+	(*Swelling_fct_pt)(x, swelling);
       }
     }
 
@@ -448,32 +520,32 @@ namespace oomph
     // Jacobian and residual contributions
 
     /// Add the element's contribution to its residual vector (wrapper)
-    void fill_in_contribution_to_residuals(Vector<double>& residuals)
+    void fill_in_contribution_to_residuals(Vector<double> & residuals)
     {
       // Call the generic residuals function with flag set to 0
       // using a dummy matrix argument
       fill_in_generic_residual_contribution_foeppl_von_karman(
-        residuals, GeneralisedElement::Dummy_matrix, 0);
+	residuals, GeneralisedElement::Dummy_matrix, 0);
     }
 
 
     /// Add the element's contribution to its residual vector and
     /// element Jacobian matrix (wrapper)
-    void fill_in_contribution_to_jacobian(Vector<double>& residuals,
-                                          DenseMatrix<double>& jacobian)
+    void fill_in_contribution_to_jacobian(Vector<double> & residuals,
+					  DenseMatrix<double> & jacobian)
     {
       // Call the generic routine with the flag set to 1
       fill_in_generic_residual_contribution_foeppl_von_karman(
-        residuals, jacobian, 1);
+	residuals, jacobian, 1);
     }
 
 
     /// Add the element's contribution to its residual vector and
     /// element Jacobian matrix (wrapper)
     void fill_in_contribution_to_jacobian_and_mass_matrix(
-      Vector<double>& residuals,
-      DenseMatrix<double>& jacobian,
-      DenseMatrix<double>& mass_matrix)
+      Vector<double> & residuals,
+      DenseMatrix<double> & jacobian,
+      DenseMatrix<double> & mass_matrix)
     {
       // Call fill in Jacobian
       fill_in_contribution_to_jacobian(residuals, jacobian);
@@ -485,7 +557,7 @@ namespace oomph
       unsigned ndof = mass_matrix.nrow();
       for (unsigned i = 0; i < ndof; i++)
       {
-        mass_matrix(i, i) += 1.0;
+	mass_matrix(i, i) += 1.0;
       }
     }
 
@@ -502,14 +574,15 @@ namespace oomph
       activate_u_exact_solve();
     }
 
-    /// Activate the alternative residuals which are used to solve for an exact
-    /// displacement field assignment (doesn't set exact function pointer)
+    /// Activate the alternative residuals which are used to solve for an
+    /// exact displacement field assignment (doesn't set exact function
+    /// pointer)
     void activate_u_exact_solve()
     {
       // Throw an error if we haven't set a function pointer for u_exact yet
       if (!U_exact_pt)
       {
-        throw OomphLibError(
+	throw OomphLibError(
 	  "You need to set U_exact_pt before activating Solve_u_exact",
 	  OOMPH_EXCEPTION_LOCATION,
 	  OOMPH_CURRENT_FUNCTION);
@@ -619,6 +692,12 @@ namespace oomph
       return Multiple_error_metric_fct_pt;
     }
 
+    /// Number of 'flux' terms for Z2 error estimation
+    unsigned num_Z2_flux_terms()
+    {
+      return 3;
+    }
+
     /// Access function: Bool that swaps element residuals to solve
     ///  (ux,uy,w) = (ux_ex,uy_ex,w_ex)
     /// which is useful for applying initial guesses or for debugging
@@ -628,7 +707,7 @@ namespace oomph
     }
 
     /// Access function: Get pointer to u_exact function
-    void get_u_exact_pt(VectorFctPt& u_exact_pt)
+    void get_u_exact_pt(VectorFctPt & u_exact_pt)
     {
       u_exact_pt = U_exact_pt;
     }
@@ -675,8 +754,8 @@ namespace oomph
 
   protected:
     //--------------------------------------------------------------------------
-    // Pure virtual interface for interpolation and test functions which must be
-    // implemented when geometry and bases are added in the derived class
+    // Pure virtual interface for interpolation and test functions which must
+    // be implemented when geometry and bases are added in the derived class
 
     // [zdec] come back to this, it seems unnecessary
     /// (pure virtual) interface to return a vector of the indices of the
@@ -695,18 +774,22 @@ namespace oomph
     virtual unsigned nw_node() const = 0;
 
 
-    /// (pure virtual) interface to get the local indices of the nodes used by u
+    /// (pure virtual) interface to get the local indices of the nodes used by
+    /// u
     virtual Vector<unsigned> get_u_node_indices() const = 0;
 
-    /// (pure virtual) interface to get the local indices of the nodes used by w
+    /// (pure virtual) interface to get the local indices of the nodes used by
+    /// w
     virtual Vector<unsigned> get_w_node_indices() const = 0;
 
 
-    /// (pure virtual) interface to get the number of basis types for u at node
+    /// (pure virtual) interface to get the number of basis types for u at
+    /// node
     /// j
     virtual unsigned nu_type_at_each_node() const = 0;
 
-    /// (pure virtual) interface to get the number of basis types for w at node
+    /// (pure virtual) interface to get the number of basis types for w at
+    /// node
     /// j
     virtual unsigned nw_type_at_each_node() const = 0;
 
@@ -714,37 +797,36 @@ namespace oomph
     /// (pure virtual) interface to retrieve the value of u_alpha at node j of
     /// type k
     virtual double get_u_alpha_value_at_node_of_type(
-      const unsigned& alpha,
-      const unsigned& j_node,
-      const unsigned& k_type) const = 0;
+      const unsigned& alpha, const unsigned& j_node, const unsigned& k_type)
+      const = 0;
 
     /// (pure virtual) interface to retrieve the t-th history value value of
     /// u_alpha at node j of type k
-    virtual double get_u_alpha_value_at_node_of_type(
-      const unsigned& t_time,
-      const unsigned& alpha,
-      const unsigned& j_node,
-      const unsigned& k_type) const = 0;
+    virtual double get_u_alpha_value_at_node_of_type(const unsigned& t_time,
+						     const unsigned& alpha,
+						     const unsigned& j_node,
+						     const unsigned& k_type)
+      const = 0;
 
-    /// (pure virtual) interface to retrieve the value of w at node j of type k
+    /// (pure virtual) interface to retrieve the value of w at node j of type
+    /// k
     virtual double get_w_value_at_node_of_type(
       const unsigned& j_node, const unsigned& k_type) const = 0;
 
-    /// (pure virtual) interface to retrieve the t-th history value of w at node
-    /// j of type k
+    /// (pure virtual) interface to retrieve the t-th history value of w at
+    /// node j of type k
     virtual double get_w_value_at_node_of_type(
-      const unsigned& t_time,
-      const unsigned& j_node,
-      const unsigned& k_type) const = 0;
+      const unsigned& t_time, const unsigned& j_node, const unsigned& k_type)
+      const = 0;
 
     // [IN-PLANE-INTERNAL]
-    // /// (pure virtual) interface to get the pointer to the internal data used
-    // to
+    // /// (pure virtual) interface to get the pointer to the internal data
+    // used to
     // /// interpolate u (NOTE: assumes each u field has exactly one internal
     // data) virtual Vector<Data*> u_internal_data_pts() const = 0;
 
-    /// (pure virtual) interface to get the pointer to the internal data used to
-    /// interpolate w (NOTE: assumes w field has exactly one internal data)
+    /// (pure virtual) interface to get the pointer to the internal data used
+    /// to interpolate w (NOTE: assumes w field has exactly one internal data)
     virtual Data* w_internal_data_pt() const = 0;
 
 
@@ -758,10 +840,11 @@ namespace oomph
 
 
     // [IN-PLANE-INTERNAL]
-    // /// (pure virtual) interface to retrieve the value of u_alpha of internal
+    // /// (pure virtual) interface to retrieve the value of u_alpha of
+    // internal
     // /// type k
-    // virtual double get_u_alpha_internal_value_of_type(const unsigned& alpha,
-    // 						    const unsigned& k_type) const = 0;
+    // virtual double get_u_alpha_internal_value_of_type(const unsigned&
+    // alpha, 						    const unsigned& k_type) const = 0;
 
     // /// (pure virtual) interface to retrieve the t-th history value of
     // u_alpha of
@@ -771,8 +854,8 @@ namespace oomph
     // 						    const unsigned& k_type) const = 0;
 
     /// (pure virtual) interface to retrieve the value of w of internal type k
-    virtual double get_w_internal_value_of_type(
-      const unsigned& k_type) const = 0;
+    virtual double get_w_internal_value_of_type(const unsigned& k_type)
+      const = 0;
 
     /// (pure virtual) interface to retrieve the t-th history value of w of
     /// internal type k
@@ -782,7 +865,7 @@ namespace oomph
     /// (pure virtual) In-plane basis functions and derivatives w.r.t. global
     /// coords at local coordinate s; return det(Jacobian of mapping)
     virtual double basis_u_foeppl_von_karman(const Vector<double>& s,
-                                             Shape& psi_n) const = 0;
+					     Shape& psi_n) const = 0;
 
     /// (pure virtual) In-plane basis functions and derivatives w.r.t. global
     /// coords at local coordinate s; return det(Jacobian of mapping)
@@ -799,9 +882,8 @@ namespace oomph
       DShape& dtest_n_dx) const = 0;
 
     /// (pure virtual) Out-of-plane basis functions at local coordinate s
-    virtual void basis_w_foeppl_von_karman(const Vector<double>& s,
-                                           Shape& psi_n,
-                                           Shape& psi_i) const = 0;
+    virtual void basis_w_foeppl_von_karman(
+      const Vector<double>& s, Shape& psi_n, Shape& psi_i) const = 0;
 
     /// (pure virtual) Out-of-plane basis functions and derivs w.r.t. global
     /// coords at local coordinate s; return det(Jacobian of mapping)
@@ -816,13 +898,14 @@ namespace oomph
 
     /// (pure virtual) Out-of-plane basis/test functions at local coordinate s
     virtual void basis_and_test_w_foeppl_von_karman(const Vector<double>& s,
-                                                    Shape& psi_n,
-                                                    Shape& psi_i,
-                                                    Shape& test_n,
-                                                    Shape& test_i) const = 0;
+						    Shape& psi_n,
+						    Shape& psi_i,
+						    Shape& test_n,
+						    Shape& test_i) const = 0;
 
-    /// (pure virtual) Out-of-plane basis/test functions and first derivs w.r.t.
-    /// to global coords at local coordinate s; return det(Jacobian of mapping)
+    /// (pure virtual) Out-of-plane basis/test functions and first derivs
+    /// w.r.t. to global coords at local coordinate s; return det(Jacobian of
+    /// mapping)
     virtual double dbasis_and_dtest_w_eulerian_foeppl_von_karman(
       const Vector<double>& s,
       Shape& psi_n,
@@ -834,9 +917,9 @@ namespace oomph
       DShape& dtest_n_dx,
       DShape& dtest_i_dx) const = 0;
 
-    /// (pure virtual) Out-of-plane basis/test functions and first/second derivs
-    /// w.r.t. to global coords at local coordinate s;
-    /// return det(Jacobian of mapping)
+    /// (pure virtual) Out-of-plane basis/test functions and first/second
+    /// derivs w.r.t. to global coords at local coordinate s; return
+    /// det(Jacobian of mapping)
     virtual double d2basis_and_d2test_w_eulerian_foeppl_von_karman(
       const Vector<double>& s,
       Shape& psi_n,
@@ -859,10 +942,9 @@ namespace oomph
     /// Compute element residual Vector only (if flag=and/or element
     /// Jacobian matrix
     virtual void fill_in_generic_residual_contribution_foeppl_von_karman(
-      Vector<double>& residuals,
-      DenseMatrix<double>& jacobian,
+      Vector<double> & residuals,
+      DenseMatrix<double> & jacobian,
       const unsigned& flag);
-
 
 
   private:
