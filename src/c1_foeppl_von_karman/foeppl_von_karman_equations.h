@@ -194,6 +194,15 @@ namespace oomph
         OOMPH_EXCEPTION_LOCATION);
     }
 
+    /// Output: x, y, sigma_xx, sigma_xy, sigma_yy,
+    ///         (sigma_1, sigma_2, sigma_1x, sigma1y, sigma2x, sigma2y)
+    ///                                   (if principal_stresses==true)
+    /// at the Gauss integration points to obtain a smooth point
+    /// cloud (stress may be discontinuous across elements in general)
+    void output_smooth_stress(std::ostream &outfile,
+                              const bool &principal_stresses=false);
+
+
 
     //----------------------------------------------------------------------
     // Error and norms
