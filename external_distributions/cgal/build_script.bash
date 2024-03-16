@@ -124,6 +124,7 @@ build_opts="-DWITH_GMP=true \
             -DMPFR_INCLUDE_DIR=$mpfr_include \
             -DMPFR_LIBRARIES=$mpfr_actual_library \
             -DBOOST_INCLUDEDIR=$boost_include \
+            -DWITH_CGAL_Qt5=false \
             $src_dir"
 echo "build options: "$build_opts
 cmake $build_opts
