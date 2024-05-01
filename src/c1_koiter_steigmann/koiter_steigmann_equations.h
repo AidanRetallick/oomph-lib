@@ -159,9 +159,20 @@ namespace oomph
       KoiterSteigmannEquations::output(outfile, n_plot);
     }
 
-    /// \short Output FE representation of soln: x,y,u or x,y,z,u at
+    /// Output including stress with default number of plot points
+    void output_stress(std::ostream& outfile)
+    {
+      const unsigned n_plot = 5;
+      KoiterSteigmannEquations::output(outfile, n_plot);
+    }
+
+    /// Output FE representation of soln: x,y,u or x,y,z,u at
     /// n_plot^DIM plot points
     void output(std::ostream& outfile, const unsigned& n_plot);
+
+    /// Output FE representation of soln: x,y,u,stress at
+    /// n_plot^DIM plot points
+    void output_stress(std::ostream& outfile, const unsigned& n_plot);
 
     /// C_style output with default number of plot points
     void output(FILE* file_pt)

@@ -975,6 +975,102 @@ namespace oomph
 
 
   //======================================================================
+  /// Output function:
+  ///
+  ///   x,y,u,stress
+  ///
+  /// nplot points in each coordinate direction
+  //======================================================================
+  void KoiterSteigmannEquations::output_stress(std::ostream & outfile,
+					       const unsigned& nplot)
+  {
+    // Dimension of the element
+    const unsigned dim = this->dim();
+
+    // Vector of local and global coordinates
+    Vector<double> s(dim, 0.0);
+    Vector<double> x(dim, 0.0);
+
+    // Vector of displaced position cordinates
+    Vector<double> r(dim, 0.0);
+    DenseMatrix<double> drdx(Number_of_displacements, dim, 0.0);
+
+    // Storage for prestrain, strain, metric and stress
+    DenseMatrix<double> prestrain(dim, dim, 0.0);
+    DenseMatrix<double> strain(dim, dim, 0.0);
+    DenseMatrix<double> metric(dim, dim, 0.0);
+    DenseMatrix<double> stress(dim, dim, 0.0);
+
+    // Tecplot header info
+    outfile << this->tecplot_zone_string(nplot);
+
+    // Loop over plot points
+    unsigned num_plot_points = this->nplot_points(nplot);
+    // Vector<double> r(3);
+
+    for (unsigned iplot = 0; iplot < num_plot_points; iplot++)
+    {
+      // Get local coordinates of plot point
+      this->get_s_plot(iplot, nplot, s);
+
+      // Get the displacement
+      Vector<Vector<double>> u(Number_of_displacements,
+			       Vector<double>(6, 0.0));
+      interpolated_koiter_steigmann_disp(s, u);
+
+      // Extract the gradient and displaced position from the displacements
+      DenseMatrix<double> dudx(Number_of_displacements, dim, 0.0);
+      for(unsigned i = 0; i < Number_of_displacements; i++)
+      {
+	r[i] = x[i] + u[i][0];
+	for(unsigned j = 0; j < dim; j++)
+	{
+	  dudx(i,j) = u[i][1+j];
+	  drdx(i,j) = dudx(i,j) + (double)(i==j);
+	}
+      }
+
+      // Get x position as Vector
+      this->interpolated_x(s, x);
+
+      // Get the strain and stress
+      fill_in_metric_tensor(drdx, metric);
+      get_prestrain(iplot, x, prestrain);
+      fill_in_strain_tensor(dudx, prestrain, strain);
+      fill_in_stress_tensor(x, r, strain, metric, stress);
+
+      for (unsigned i = 0; i < dim; i++)
+      {
+	outfile << x[i] << " ";
+      }
+
+      // Loop for displacements
+      for (unsigned i = 0; i < Number_of_displacements; i++)
+      {
+	for (unsigned j = 0; j < 6; j++)
+	{
+	  outfile << u[i][j] << " ";
+	}
+      }
+
+      // Loop for stress
+      for (unsigned i = 0; i < 2; i++)
+      {
+	for (unsigned j = 0; j < 2; j++)
+	{
+	  outfile << stress(i,j) << " ";
+	}
+      }
+
+      outfile << std::endl;
+    }
+
+    // Write tecplot footer (e.g. FE connectivity lists)
+    this->write_tecplot_zone_footer(outfile, nplot);
+  }
+
+
+  //======================================================================
   /// C-style output function:
   ///
   ///   x,y,u   or    x,y,z,u
