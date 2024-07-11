@@ -189,7 +189,7 @@ def main(argv):
 
         # Convert from oomph-lib Tecplot format to VTP XML format
         elif isuffix == "dat" and osuffix == "vtp":
-            tecplot_to_vtpxml(ifilename, ofilename,string.atoi(argdim))
+            tecplot_to_vtpxml(ifilename, ofilename,int(argdim))
 
         else:   
             error("Sorry, cannot convert between .%s and .%s file formats." % (isuffix, osuffix))
