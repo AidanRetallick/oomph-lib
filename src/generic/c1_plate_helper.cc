@@ -259,7 +259,8 @@ namespace C1PlateHelper
        }
 #endif
 #endif
-        
+
+      
   // Storage for collection of nodes that occupy two boundaries together
   // with the boundary IDs (ordered: first < second)
   std::map<Node*,std::pair<unsigned,unsigned>> boundaries_of_boundary_node_pt;
@@ -334,10 +335,8 @@ namespace C1PlateHelper
     // the boundary where the node is to be duplicated
     FiniteElement* el_where_node_is_to_be_duplicated_pt=0;
 
-
-     // hierher Aidan: we need to include the elements for which the node is
-     // the only one on the boundary. Or do we?
-                                                         
+    // Note: in this context we do not need to include the elements 
+    // for which the node is the only one on the boundary.
                                                          
     // Store elements and local node number within them
     // that need to have node replaced
@@ -386,8 +385,6 @@ namespace C1PlateHelper
 
     // Get timestepper of original node
     TimeStepper* time_stepper_pt=node_to_be_duplicated_pt->time_stepper_pt();
-
-
      
     // Now we need to create a new node and substitute the element's
     // old corner node for this new one:
@@ -590,7 +587,7 @@ namespace C1PlateHelper
     
     // Add the constraining element to the mesh
     constraint_mesh_pt->add_element_pt(constraint_element_pt);
-   }   
+   }
  }
 
 

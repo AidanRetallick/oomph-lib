@@ -1278,6 +1278,11 @@ namespace oomph
     /// as the initial guess in the Newton method for locate_zeta)
     extern unsigned N_local_points;
 
+   /// Use FD for working out dzeta/ds in locate_zeta. False by default
+   /// Should be set to true for elements that don't implement dshape(s,...)
+   /// (e.g. C1 FvK, KS elements)
+   extern bool Evaluate_dzeta_ds_by_fd;
+   
   } // namespace Locate_zeta_helpers
 
 

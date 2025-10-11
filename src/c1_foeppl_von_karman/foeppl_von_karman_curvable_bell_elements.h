@@ -498,11 +498,11 @@ namespace oomph
       DenseMatrix<double>& jacobian,
       const unsigned& flag)
     {
-      // [zdec] debug
-      std::cout << std::endl
-                << std::endl
-                << "ADD CONTRIBUTION FROM CONSTRAINTS" << std::endl
-                << "=============================================" << std::endl;
+      // // [zdec] debug
+      // std::cout << std::endl
+      //           << std::endl
+      //           << "ADD CONTRIBUTION FROM CONSTRAINTS" << std::endl
+      //           << "=============================================" << std::endl;
       //----------------------------------------------------------------------
       //----------------------------------------------------------------------
       // Calculate Jacobian and Hessian of coordinate transform between

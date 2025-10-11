@@ -939,8 +939,6 @@ namespace oomph
 
     // Loop over plot points
     unsigned num_plot_points = this->nplot_points(nplot);
-    // Vector<double> r(3);
-
     for (unsigned iplot = 0; iplot < num_plot_points; iplot++)
     {
       // Get local coordinates of plot point

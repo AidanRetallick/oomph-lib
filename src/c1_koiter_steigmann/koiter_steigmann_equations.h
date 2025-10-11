@@ -151,6 +151,34 @@ namespace oomph
     //----------------------------------------------------------------------
     // Output and documentation
 
+   /// Output solution in data vector at local cordinates s: x,y,u,v,w
+   void point_output_data(const Vector<double>& s, Vector<double>& data)
+    {          
+     // Number of coordinates
+     unsigned dim = this->dim();
+     
+     // Provide storage
+     data.resize(dim+Number_of_displacements);
+     
+     // Output the interpolated global coords
+     Vector<double> x(dim, 0.0);
+     interpolated_x(s, x);
+     for (unsigned i=0;i<dim;i++)
+      {
+       data[i]=x[i];
+      }
+     
+     // Output solution: u,v,w
+     Vector<Vector<double>> u(Number_of_displacements,
+                              Vector<double>(6, 0.0));
+     interpolated_koiter_steigmann_disp(s, u);
+     for (unsigned i=0;i<Number_of_displacements;i++)
+      {
+       data[dim+i]=u[i][0];
+      }
+    }
+
+   
     /// Output displacements with default number of plot points
     void output(std::ostream& outfile)
     {

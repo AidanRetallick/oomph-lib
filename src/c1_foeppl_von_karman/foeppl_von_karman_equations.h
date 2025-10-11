@@ -144,6 +144,37 @@ namespace oomph
     //----------------------------------------------------------------------
     // Output and documentation
 
+
+   /// Output solution in data vector at local cordinates s: x,y,u,v,w
+   void point_output_data(const Vector<double>& s, Vector<double>& data)
+    {     
+     // Number of unknowns: u,v,w
+     unsigned n_unknown = 3;
+     
+     // Number of coordinates
+     unsigned dim = this->dim();
+     
+     // Provide storage
+     data.resize(dim+n_unknown);
+     
+     
+     // Output the interpolated global coords
+     Vector<double> x(dim, 0.0);
+     interpolated_x(s, x);
+     for (unsigned i=0;i<dim;i++)
+      {
+       data[i]=x[i];
+      }
+     
+     // Output solution: u,v,w
+     Vector<double> interpolated_vals(n_unknown, 0.0);
+     interpolated_vals = interpolated_fvk_disp(s);
+     for (unsigned i=0;i<n_unknown;i++)
+      {
+       data[dim+i]=interpolated_vals[i];
+      }
+    }
+ 
     /// Output with default number of plot points
     void output(std::ostream& outfile)
     {

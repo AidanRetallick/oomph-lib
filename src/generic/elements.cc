@@ -1691,6 +1691,12 @@ namespace oomph
     /// which has the smallest initial residual (and is therefore used
     /// as the initial guess in the Newton method when locating coordinate)
     unsigned N_local_points = 5;
+
+   /// Use FD for working out dzeta/ds in locate_zeta. False by default
+   /// Should be set to true for elements that don't implement dshape(s,...)
+   /// (e.g. C1 FvK, KS elements)
+   bool Evaluate_dzeta_ds_by_fd=false;
+   
   } // namespace Locate_zeta_helpers
 
 
@@ -4944,68 +4950,93 @@ namespace oomph
       }
       else // no macro element, so compute Jacobian with shape functions etc.
       {
-        // Compute the entries of the Jacobian matrix
-        unsigned n_node = this->nnode();
-        unsigned n_position_type = this->nnodal_position_type();
-        Shape psi(n_node, n_position_type);
-        DShape dpsids(n_node, n_position_type, ncoord);
-
-        // Get the local shape functions and their derivatives
-        dshape_local(s, psi, dpsids);
-
-        // Calculate the values of dxds
-        DenseMatrix<double> interpolated_dxds(ncoord, ncoord, 0.0);
-
-        // MH: No longer needed
-        //          //This implementation will only work for n_position_type=1
-        //          //since the function nodal_position_gen does not yet exist
-        // #ifdef PARANOID
-        //          if (n_position_type!=1)
-        //           {
-        //            std::ostringstream error_stream;
-        //            error_stream << "This implementation does not exist
-        //            yet;\n"
-        //                         << "it currently uses
-        //                         raw_nodal_position_gen\n"
-        //                         << "which does not take hangingness into
-        //                         account\n"
-        //                         << "It will work if n_position_type=1\n";
-        //            throw OomphLibError(error_stream.str(),
-        //         OOMPH_CURRENT_FUNCTION,
-        //                                OOMPH_EXCEPTION_LOCATION);
-        //           }
-        // #endif
-
-        // Loop over the nodes
-        for (unsigned l = 0; l < n_node; l++)
-        {
-          // Loop over position type even though it should be 1; the
-          // functionality for n_position_type>1 will exist in the future
-          for (unsigned k = 0; k < n_position_type; k++)
+       // Do it by FD after all?
+       if (Locate_zeta_helpers::Evaluate_dzeta_ds_by_fd)
+        {         
+         // Assemble jacobian on the fly by finite differencing
+         Vector<double> work_s = s;
+         Vector<double> interp_zeta(ncoord);
+         this->interpolated_zeta(work_s, interp_zeta);
+         
+         // Finite difference step
+         double fd_step = GeneralisedElement::Default_fd_jacobian_step;
+         
+         // Storage for calculated zeta from incremented s
+         Vector<double> work_zeta(ncoord, 0.0);
+         
+         // Loop over s coordinates
+         for (unsigned i = 0; i < ncoord; i++)
           {
-            // Add the contribution from the nodal coordinates to the matrix
-            for (unsigned i = 0; i < ncoord; i++)
+           // Increment work_s by a small amount
+           work_s[i] += fd_step;
+           
+           // Calculate work_r 
+           this->interpolated_zeta(work_s, work_zeta);
+           
+           // Loop over r to fill Jacobian
+           for (unsigned j = 0; j < ncoord; j++)
             {
-              for (unsigned j = 0; j < ncoord; j++)
+             jacobian(j, i) = -(work_zeta[j] - interp_zeta[j]) / fd_step;
+            }
+           
+           // Reset work_s
+           work_s[i] = s[i];
+          }
+         
+        }
+       else 
+        {
+         // Compute the entries of the Jacobian matrix
+         unsigned n_node = this->nnode();
+         unsigned n_position_type = this->nnodal_position_type();
+         Shape psi(n_node, n_position_type);
+         DShape dpsids(n_node, n_position_type, ncoord);
+         
+         // Get the local shape functions and their derivatives.
+         // Note: if the code dies here because this function is
+         // broken (e.g. for C1 FvK or KS elements, set
+         // Locate_zeta_helpers::Evaluate_dzeta_ds_by_fd to true.
+         // Could possibly do this by default, but...
+         dshape_local(s, psi, dpsids);
+         
+         // Calculate the values of dxds
+         DenseMatrix<double> interpolated_dxds(ncoord, ncoord, 0.0);
+         
+         // Loop over the nodes
+         for (unsigned l = 0; l < n_node; l++)
+          {
+           // Loop over position type even though it should be 1; the
+           // functionality for n_position_type>1 will exist in the future
+           for (unsigned k = 0; k < n_position_type; k++)
+            {
+             // Add the contribution from the nodal coordinates to the matrix
+             for (unsigned i = 0; i < ncoord; i++)
               {
-                interpolated_dxds(i, j) +=
+               for (unsigned j = 0; j < ncoord; j++)
+                {
+                 interpolated_dxds(i, j) +=
                   this->zeta_nodal(l, k, i) * dpsids(l, k, j);
+                }
               }
             }
           }
-        }
-
-        // The entries of the Jacobian matrix are merely dresiduals/ds
-        // i.e. \f$ -dx/ds \f$
-        for (unsigned i = 0; i < ncoord; i++)
-        {
-          for (unsigned j = 0; j < ncoord; j++)
+         
+         // The entries of the Jacobian matrix are merely dresiduals/ds
+         // i.e. \f$ -dx/ds \f$
+         for (unsigned i = 0; i < ncoord; i++)
           {
-            jacobian(i, j) = -interpolated_dxds(i, j);
+           for (unsigned j = 0; j < ncoord; j++)
+            {
+             jacobian(i, j) = -interpolated_dxds(i, j);
+            }
           }
-        }
-      }
+         
+        } // end analytical jacobian
 
+       
+      }
+      
+      
       // Now solve the damn thing
       try
       {
