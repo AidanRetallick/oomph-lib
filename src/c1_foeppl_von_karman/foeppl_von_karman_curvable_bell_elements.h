@@ -1153,8 +1153,8 @@ namespace oomph
 
 
 
-  protected:
-
+   // protected:
+  public: // hierher change back to protected once we've dropped the interpolation tests back to lower classes
 
     //----------------------------------------------------------------------------
     // Interface to FoepplVonKarmanEquations (can this all be (static) data?)
@@ -1812,6 +1812,8 @@ namespace oomph
   /// boundary. This function does a DenseDoubleMatrix solve to determine
   /// new basis - which could be speeded up by caching the matrices higher
   /// up and performing the LU decomposition only once
+ //
+ // hierher shouldn't this live further down?
   //======================================================================
   template<unsigned NNODE_1D>
   inline void FoepplVonKarmanC1CurvableBellElement<NNODE_1D>::rotate_shape(

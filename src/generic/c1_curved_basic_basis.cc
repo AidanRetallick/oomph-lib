@@ -43,13 +43,14 @@
 
 // [zdec] TODO: Importantly, as this is all geometry independent, it can all be
 // precomputed, this is currently only done for p=5 curved Bell elements so far
-// though. Once this is done for p=3,
+// though. Once this is done for p=3, // hierher this comment ends mid sentence
 
 
 // We could definitely store this as a static  // hierher Aidan: Let's!
 // UPDATE after initial pull request: Can't
 // now remember what we decided, but can you sort this out (or raise it again)
 // when you do your tidies (plenty of zdecs anyway)
+// hierher: MH asking himself why can't we do it?
 
 
 // hierher Aidan: Also, where is this from? Code looks machine generated. Do we have
@@ -63,6 +64,9 @@ namespace oomph
     void BernadouElementBasis<3>::full_basic_polynomials(
       const Vector<double>& s, Shape& phi) const
     {
+
+     // hierher pause("in BernadouElementBasis<3>::full_basic_polynomials");
+
       // This will be replaced eventually - in favour of the explicit shape
       // functions
       // Get the number of basic basis function
@@ -87,10 +91,13 @@ namespace oomph
     }
 
     /// Precomputed dbasis polynomials for the 3rd order boundary representation
+    /// hierher dbasis =  derivatives?
     template<>
     void BernadouElementBasis<3>::dfull_basic_polynomials(
       const Vector<double>& s, DShape& dphi) const
     {
+     // hierher pause("in BernadouElementBasis<3>::dfull_basic_polynomials");
+          
       // This will be replaced eventually - in favour of the explicit shape
       // functions
       // Get the number of basic basis function
@@ -119,10 +126,15 @@ namespace oomph
 
     /// Precomputed d2basis polynomials for the 3rd order boundary
     /// representation
+    /// hierher d2basis =  second derivatives?
     template<>
     void BernadouElementBasis<3>::d2full_basic_polynomials(
       const Vector<double>& s, DShape& d2phi) const
     {
+
+     // hierher pause("in BernadouElementBasis<3>::d2full_basic_polynomials");
+
+          
       // This will be replaced eventually - in favour of the explicit shape
       // functions
       // Get the number of basic basis function
@@ -154,6 +166,9 @@ namespace oomph
     void BernadouElementBasis<5>::full_basic_polynomials(
       const Vector<double>& s_basic, Shape& phi) const
     {
+
+     // hierher pause("in BernadouElementBasis<5>::full_basic_polynomials");
+     
       // For convenience separate coordinates
       const double s = s_basic[0], t = s_basic[1];
       // Precompute powers of coordinates
@@ -578,10 +593,14 @@ namespace oomph
     }
 
     /// Precomputed dbasis polynomials for the 5th order boundary representation
+    /// hierher dbasis = derivatives?
     template<>
     void BernadouElementBasis<5>::dfull_basic_polynomials(
       const Vector<double>& s_basic, DShape& dphi) const
     {
+
+     // hierher pause("in BernadouElementBasis<5>::dfull_basic_polynomials");
+     
       // For convenience
       const double s = s_basic[0], t = s_basic[1];
 
@@ -1563,10 +1582,14 @@ namespace oomph
 
     /// Precomputed d2basis polynomials for the 5th order boundary
     /// representation
+    /// hierher dbasis = 2nd derivatives?
     template<>
     void BernadouElementBasis<5>::d2full_basic_polynomials(
       const Vector<double>& s_basic, DShape& d2phi) const
     {
+
+     // hierher pause("in BernadouElementBasis<5>::d2full_basic_polynomials");
+     
       // For convenience
       const double s = s_basic[0], t = s_basic[1];
       // Precompute

@@ -44,7 +44,7 @@
 // and not what we need for C1 hermite basis on curved triangles, so we use the
 // constraints that the triangle edges only need to interpolate degree 5
 // polynomials and that the normal derivatives along edges only need to
-// interpolate degree 3 polynomials. This makes many of the dofs redunant and
+// interpolate degree 3 polynomials. This makes many of the dofs redundant and
 // the conversion to the new basis is implemented in the file
 // c1_curved_basic_basis.cc
 
@@ -58,7 +58,7 @@
 
 
 
-// We could definitely store this as a static
+// We could definitely store this as a static hierher: do it
 namespace oomph
 {
 
@@ -1877,6 +1877,7 @@ namespace oomph
     /// The inverse monomial to basic matrix for elements with 3rd order
     /// boundary interpolation: the basic element has 36 values, resulting in a
     /// 36x36 matrix BROKEN FUNCTION - not implemented for 3rd order boundaries
+    // hierher ??? 
     template<>
     void BernadouElementBasis<3>::inverse_monomial_to_basic_matrix(
       DenseDoubleMatrix& ib2l) const

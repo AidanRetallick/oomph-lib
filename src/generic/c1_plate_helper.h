@@ -812,7 +812,7 @@ namespace C1PlateHelper
  void upgrade_triangle_mesh_for_c1_plate_bending(
   TriangleMeshBase* bulk_mesh_pt,
   Mesh* constraint_mesh_pt,
-  const bool& rotate_coordinates_on_all_curvilinear_bounadries=true)
+  const bool& rotate_coordinates_on_all_curvilinear_boundaries=true)
  {
 
   // hierher make global member of namespace
@@ -918,7 +918,7 @@ namespace C1PlateHelper
   // the constraint elements impose continuity ini terms of the
   // curvilinear boundary representations to the nodes need to store
   // derivative dofs in terms of these, i.e. they need to be rotated!
-  if (rotate_coordinates_on_all_curvilinear_bounadries)
+  if (rotate_coordinates_on_all_curvilinear_boundaries)
    {
     oomph_info << "Rotating coordinates on all curvilinear boundaries\n"
                <<"therefore also duplicating corner nodes"
@@ -960,7 +960,7 @@ namespace C1PlateHelper
    bulk_mesh_pt,
    c1_curviline_boundary_pt);
 
-  if (rotate_coordinates_on_all_curvilinear_bounadries)
+  if (rotate_coordinates_on_all_curvilinear_boundaries)
    {
     oomph_info << "Rotating coordinates on all curvilinear boundaries!"
                << std::endl;
