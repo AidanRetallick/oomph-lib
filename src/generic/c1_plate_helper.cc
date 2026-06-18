@@ -4,7 +4,13 @@
 namespace oomph
 {
 
-
+ 
+ /// Static double to define the default tolerance with which the
+ /// Newton method in get_zeta(...)
+ /// determines the local coordinate zeta associated with a
+ /// specified point on the curviline.
+ double C1CurviLine::Tol_for_get_zeta=1.0e-12;
+ 
 
  //===============================================================================
  /// Document the pin status of the Lagrange multipliers
@@ -351,18 +357,18 @@ namespace C1PlateHelper
        (boundary_on_which_node_is_duplicated, i_b_el);
 
 
-      oomph_info << "Testing if element " << i_b_el << " of "
-                 << n_b_el << " : " <<  el_pt << " with vertices at \n"
-                 << el_pt->node_pt(0)->x(0) << " "
-                 << el_pt->node_pt(0)->x(1) << "\n"
-                 << el_pt->node_pt(1)->x(0) << " "
-                 << el_pt->node_pt(1)->x(1) << "\n"
-                 << el_pt->node_pt(2)->x(0) << " "
-                 << el_pt->node_pt(2)->x(1) << "\n"
-                 << "contains the to be replaced node "
-                 << node_to_be_duplicated_pt << " on boundary "
-                 << boundary_on_which_node_is_duplicated
-                 << std::endl;
+      // oomph_info << "Testing if element " << i_b_el << " of "
+      //            << n_b_el << " : " <<  el_pt << " with vertices at \n"
+      //            << el_pt->node_pt(0)->x(0) << " "
+      //            << el_pt->node_pt(0)->x(1) << "\n"
+      //            << el_pt->node_pt(1)->x(0) << " "
+      //            << el_pt->node_pt(1)->x(1) << "\n"
+      //            << el_pt->node_pt(2)->x(0) << " "
+      //            << el_pt->node_pt(2)->x(1) << "\n"
+      //            << "contains the to be replaced node "
+      //            << node_to_be_duplicated_pt << " on boundary "
+      //            << boundary_on_which_node_is_duplicated
+      //            << std::endl;
       
       // If the corner node pt is in the element we have found the right
       // element
@@ -371,12 +377,12 @@ namespace C1PlateHelper
        {
         if (identified_element_that_will_make_the_new_node)
          {
-          oomph_info << "    YES: replace but don't build " << std::endl;
+          //oomph_info << "    YES: replace but don't build " << std::endl;
           node_to_be_replaced_set.insert(std::make_pair(el_pt,j_local));
          }
         else
          {
-          oomph_info << "    YES: replace and build " << std::endl;
+          //oomph_info << "    YES: replace and build " << std::endl;
           el_where_node_is_to_be_duplicated_pt = el_pt;
           identified_element_that_will_make_the_new_node=true;
          }
@@ -399,20 +405,20 @@ namespace C1PlateHelper
      construct_boundary_node(local_node_number_of_to_be_replaced_node,
                              time_stepper_pt);
 
-    oomph_info << "Dealing with boundaries (dupl,left) "
-               << boundary_on_which_node_is_duplicated << " "
-               << boundary_on_which_node_is_left << " "
-               << " Replacing node " << local_node_number_of_to_be_replaced_node
-               << " " << hierher_old_node_pt
-               << " in element " << el_where_node_is_to_be_duplicated_pt
-               << " with vertices at \n"
-               << el_where_node_is_to_be_duplicated_pt->node_pt(0)->x(0) << " "
-               << el_where_node_is_to_be_duplicated_pt->node_pt(0)->x(1) << "\n"
-               << el_where_node_is_to_be_duplicated_pt->node_pt(1)->x(0) << " "
-               << el_where_node_is_to_be_duplicated_pt->node_pt(1)->x(1) << "\n"
-               << el_where_node_is_to_be_duplicated_pt->node_pt(2)->x(0) << " "
-               << el_where_node_is_to_be_duplicated_pt->node_pt(2)->x(1) << "\n"
-               << " with new node " << new_node_pt << std::endl;
+    // oomph_info << "Dealing with boundaries (dupl,left) "
+    //            << boundary_on_which_node_is_duplicated << " "
+    //            << boundary_on_which_node_is_left << " "
+    //            << " Replacing node " << local_node_number_of_to_be_replaced_node
+    //            << " " << hierher_old_node_pt
+    //            << " in element " << el_where_node_is_to_be_duplicated_pt
+    //            << " with vertices at \n"
+    //            << el_where_node_is_to_be_duplicated_pt->node_pt(0)->x(0) << " "
+    //            << el_where_node_is_to_be_duplicated_pt->node_pt(0)->x(1) << "\n"
+    //            << el_where_node_is_to_be_duplicated_pt->node_pt(1)->x(0) << " "
+    //            << el_where_node_is_to_be_duplicated_pt->node_pt(1)->x(1) << "\n"
+    //            << el_where_node_is_to_be_duplicated_pt->node_pt(2)->x(0) << " "
+    //            << el_where_node_is_to_be_duplicated_pt->node_pt(2)->x(1) << "\n"
+    //            << " with new node " << new_node_pt << std::endl;
     
     // Copy the position and other info from the old node into the new node
     new_node_pt->x(0)=node_to_be_duplicated_pt->x(0);
@@ -425,18 +431,18 @@ namespace C1PlateHelper
     // created one in all other boundary elements that shared it
     for (auto [fe_pt, j_local] : node_to_be_replaced_set)
      {
-      oomph_info << "Also replacing node " << j_local << " : "
-                 << fe_pt->node_pt(j_local) << " in element "
-                 << fe_pt
-                 << " with vertices at \n"
-                 << fe_pt->node_pt(0)->x(0) << " "
-                 << fe_pt->node_pt(0)->x(1) << "\n"
-                 << fe_pt->node_pt(1)->x(0) << " "
-                 << fe_pt->node_pt(1)->x(1) << "\n"
-                 << fe_pt->node_pt(2)->x(0) << " "
-                 << fe_pt->node_pt(2)->x(1) << "\n"
-                 << "with the new node " << new_node_pt
-                 << std::endl;
+      // oomph_info << "Also replacing node " << j_local << " : "
+      //            << fe_pt->node_pt(j_local) << " in element "
+      //            << fe_pt
+      //            << " with vertices at \n"
+      //            << fe_pt->node_pt(0)->x(0) << " "
+      //            << fe_pt->node_pt(0)->x(1) << "\n"
+      //            << fe_pt->node_pt(1)->x(0) << " "
+      //            << fe_pt->node_pt(1)->x(1) << "\n"
+      //            << fe_pt->node_pt(2)->x(0) << " "
+      //            << fe_pt->node_pt(2)->x(1) << "\n"
+      //            << "with the new node " << new_node_pt
+      //            << std::endl;
        fe_pt->node_pt(j_local)=new_node_pt;
      }
 
@@ -445,42 +451,42 @@ namespace C1PlateHelper
     // Keep track sowe can update the elements
     newly_created_node_pt[node_to_be_duplicated_pt] = new_node_pt;
     
-    // hierher debug
-    {
-     oomph_info << "hierher BEFORE" << std::endl;
-     oomph_info << "to be duplicated: " << node_to_be_duplicated_pt << "\n"
-                << "new             : " << new_node_pt
-                << std::endl;
+    // // hierher debug
+    // {
+    //  oomph_info << "hierher BEFORE" << std::endl;
+    //  oomph_info << "to be duplicated: " << node_to_be_duplicated_pt << "\n"
+    //             << "new             : " << new_node_pt
+    //             << std::endl;
 
-     std::set<Node*> nod_pt_set={node_to_be_duplicated_pt,new_node_pt};
-     for (Node* nod_pt : nod_pt_set)
-      {
-       oomph_info <<  "Node " << nod_pt << " at "
-                  << nod_pt->x(0) << " "
-                  << nod_pt->x(1) << " " 
-                  << " is on boundaries: ";
-       std::set<unsigned>* bnd_set_pt=0;
-       nod_pt->get_boundaries_pt(bnd_set_pt);       
-       if (bnd_set_pt!=0)
-        {
-         for (const unsigned& b : *bnd_set_pt)
-          {
-           oomph_info << b << " ";
-           if (nod_pt->boundary_coordinates_have_been_set_up())
-            {
-             Vector<double> boundary_zeta(1);
-             nod_pt->get_coordinates_on_boundary(b, boundary_zeta);
-             oomph_info << boundary_zeta[0] << " ; "; 
-            }
-           else
-            {
-             oomph_info << " @@@ "  << " ; "; 
-            }
-          }
-        }
-       oomph_info << std::endl;
-      }
-    }
+    //  std::set<Node*> nod_pt_set={node_to_be_duplicated_pt,new_node_pt};
+    //  for (Node* nod_pt : nod_pt_set)
+    //   {
+    //    // oomph_info <<  "Node " << nod_pt << " at "
+    //    //            << nod_pt->x(0) << " "
+    //    //            << nod_pt->x(1) << " " 
+    //    //            << " is on boundaries: ";
+    //    std::set<unsigned>* bnd_set_pt=0;
+    //    nod_pt->get_boundaries_pt(bnd_set_pt);       
+    //    if (bnd_set_pt!=0)
+    //     {
+    //      for (const unsigned& b : *bnd_set_pt)
+    //       {
+    //        //oomph_info << b << " ";
+    //        if (nod_pt->boundary_coordinates_have_been_set_up())
+    //         {
+    //          Vector<double> boundary_zeta(1);
+    //          nod_pt->get_coordinates_on_boundary(b, boundary_zeta);
+    //          //oomph_info << boundary_zeta[0] << " ; "; 
+    //         }
+    //        else
+    //         {
+    //          //oomph_info << " @@@ "  << " ; "; 
+    //         }
+    //       }
+    //     }
+    //    //oomph_info << std::endl;
+    //   }
+    // }
 
 
 
@@ -492,9 +498,9 @@ namespace C1PlateHelper
       copy_boundary_coordinate=true;
       node_to_be_duplicated_pt->get_coordinates_on_boundary
        (boundary_on_which_node_is_duplicated, boundary_zeta_to_be_copied);
-      oomph_info << "Getting boundary coordinate on boundary "
-                 << boundary_on_which_node_is_duplicated
-                 << " from " << node_to_be_duplicated_pt << std::endl;
+      // oomph_info << "Getting boundary coordinate on boundary "
+      //            << boundary_on_which_node_is_duplicated
+      //            << " from " << node_to_be_duplicated_pt << std::endl;
      }
     
     // Then replace the old node for the new one on the boundary
@@ -506,49 +512,49 @@ namespace C1PlateHelper
     // Copy boundary coordinate across
     if (copy_boundary_coordinate)
      {
-      oomph_info << "Adding boundary coordinate on boundary "
-                 << boundary_on_which_node_is_duplicated
-                 << " to " << new_node_pt << std::endl;
+      // oomph_info << "Adding boundary coordinate on boundary "
+      //            << boundary_on_which_node_is_duplicated
+      //            << " to " << new_node_pt << std::endl;
       new_node_pt->set_coordinates_on_boundary
        (boundary_on_which_node_is_duplicated, boundary_zeta_to_be_copied);
      }
     
-    // hierher debug
-    {
-     oomph_info << "hierher AFTER" << std::endl;
-     oomph_info << "to be duplicated: " << node_to_be_duplicated_pt << "\n"
-                << "new             : " << new_node_pt
-                << std::endl;
+    // // hierher debug
+    // {
+    //  oomph_info << "hierher AFTER" << std::endl;
+    //  oomph_info << "to be duplicated: " << node_to_be_duplicated_pt << "\n"
+    //             << "new             : " << new_node_pt
+    //             << std::endl;
 
-     std::set<Node*> nod_pt_set={node_to_be_duplicated_pt,new_node_pt};
-     for (Node* nod_pt : nod_pt_set)
-      {
-       oomph_info <<  "Node " << nod_pt << " at "
-                  << nod_pt->x(0) << " "
-                  << nod_pt->x(1) << " " 
-                  << " is on boundaries: ";
-       std::set<unsigned>* bnd_set_pt=0;
-       nod_pt->get_boundaries_pt(bnd_set_pt);       
-       if (bnd_set_pt!=0)
-        {
-         for (const unsigned& b : *bnd_set_pt)
-          {
-           oomph_info << b << " ";
-           if (nod_pt->boundary_coordinates_have_been_set_up())
-            {
-             Vector<double> boundary_zeta(1);
-             nod_pt->get_coordinates_on_boundary(b, boundary_zeta);
-             oomph_info << boundary_zeta[0] << " ; "; 
-            }
-           else
-            {
-             oomph_info << " @@@ "  << " ; "; 
-            }
-          }
-        }
-       oomph_info << std::endl;
-      }
-    }
+    //  std::set<Node*> nod_pt_set={node_to_be_duplicated_pt,new_node_pt};
+    //  for (Node* nod_pt : nod_pt_set)
+    //   {
+    //    oomph_info <<  "Node " << nod_pt << " at "
+    //               << nod_pt->x(0) << " "
+    //               << nod_pt->x(1) << " " 
+    //               << " is on boundaries: ";
+    //    std::set<unsigned>* bnd_set_pt=0;
+    //    nod_pt->get_boundaries_pt(bnd_set_pt);       
+    //    if (bnd_set_pt!=0)
+    //     {
+    //      for (const unsigned& b : *bnd_set_pt)
+    //       {
+    //        oomph_info << b << " ";
+    //        if (nod_pt->boundary_coordinates_have_been_set_up())
+    //         {
+    //          Vector<double> boundary_zeta(1);
+    //          nod_pt->get_coordinates_on_boundary(b, boundary_zeta);
+    //          oomph_info << boundary_zeta[0] << " ; "; 
+    //         }
+    //        else
+    //         {
+    //          oomph_info << " @@@ "  << " ; "; 
+    //         }
+    //       }
+    //     }
+    //    oomph_info << std::endl;
+    //   }
+    // }
 
     // The final job is to constrain this duplication using the specialised
     // Lagrange multiplier elements which enforce equality of displacement and
@@ -665,22 +671,22 @@ namespace C1PlateHelper
          if (nod_pt->is_on_boundary(ibound))  
           {
            node_is_on_curved_boundary=true;
-           oomph_info << "Node " << nod_pt << " at "
-                      << xn[n][0] << " "
-                      << xn[n][1] << " "
-                      << "is on curved boundary "
-                      << ibound << std::endl;
+           // oomph_info << "Node " << nod_pt << " at "
+           //            << xn[n][0] << " "
+           //            << xn[n][1] << " "
+           //            << "is on curved boundary "
+           //            << ibound << std::endl;
           }
         }
         if (!node_is_on_curved_boundary)
          {
           index_of_interior_node = n;
           nnode_not_on_curved_boundary++;
-          oomph_info << "Node " << nod_pt << " at "
-                     << xn[n][0] << " "
-                     << xn[n][1] << " "
-                     << "is not on curved boundary "
-                     << ibound << std::endl;
+          // oomph_info << "Node " << nod_pt << " at "
+          //            << xn[n][0] << " "
+          //            << xn[n][1] << " "
+          //            << "is not on curved boundary "
+          //            << ibound << std::endl;
          }
        }// end record boundary nodes
 
@@ -777,7 +783,6 @@ namespace C1PlateHelper
       // polynomials for the boundary representation. third order (the
       // other option) is cheaper but doesn't work for all types of
       // boundary conditions.
-      unsigned boundary_order=5;
       curv_el_pt->upgrade_element_to_curved(edge, s_ubar, s_obar,
                                             c1_curve_pt,
                                             boundary_order);

@@ -97,9 +97,12 @@ namespace oomph
    /// The underlying GeomObject encodes r(zeta); here we invert this mapping
    /// with a tolerance to get zeta associated with the given point r_target.
    /// Default implemenation based on bisection and Newton's method.
-   /// Overload with your own!
+   /// Overload with your own! Final optional argument defaults to
+   /// the static double C1CurviLine::Tol_for_get_zeta which is initialised
+   /// to 1e-12. Feel free to change but keep it small enough if you want to
+   /// check the accuracy of the boundary interpolation say.
    virtual double get_zeta(const Vector<double>& r_target,
-                           const double& tol=1.0e-8) const
+                           const double& tol=Tol_for_get_zeta) const
     {
      Vector<double> r(2);
      Vector<double> zeta_vect(1);
@@ -170,7 +173,14 @@ namespace oomph
     {
      return Triangle_mesh_curviline_pt;
     }
-   
+
+
+   /// Static double to define the default tolerance with which the
+   /// Newton method in get_zeta(...)
+   /// determines the local coordinate zeta associated with a
+   /// specified point on the curviline.
+   static double Tol_for_get_zeta;
+
   private:
 
    /// Pointer to underlying triangle object
@@ -805,14 +815,19 @@ namespace C1PlateHelper
 ///    These elements are added to the mesh pointed to by constraint_mesh_pt
 /// -- rotate the coordinates on the curvilinear boundaries so derivatives
 ///    represent derivatives in the tangential and
-///    normal direction.
+///    normal direction. // hierher check; there's now an optional boolean.
 /// The smooth mesh/domain boundaries are available via the map c1_curviline_pt.
+/// The final optional unsigned sets the order of the polynomials (3 or 5)
+/// used to approximate the curved boundary. Given the
+/// black-box-ness of this helper function we use 5 as the default
+/// because it'll always work! 
 //======================================================================
  template <class ELEMENT>
  void upgrade_triangle_mesh_for_c1_plate_bending(
   TriangleMeshBase* bulk_mesh_pt,
   Mesh* constraint_mesh_pt,
-  const bool& rotate_coordinates_on_all_curvilinear_boundaries=true)
+  const bool& rotate_coordinates_on_all_curvilinear_boundaries=true,
+  const unsigned& boundary_order=5)
  {
 
   // hierher make global member of namespace
@@ -954,11 +969,12 @@ namespace C1PlateHelper
   // edge on the curved boundary is represented by a sufficiently
   // high-order polynomial. The order can be specified by a final
   // (optional) argument to this function and can be 3 or 5. Given the
-  // black-box-ness of this helper function we use 5 (the default)
-  // because it'll always work! 
+  // black-box-ness of this helper function we use 5 (passed in by the default args
+  // to this function) because it'll always work! 
   upgrade_edge_elements_to_curved_boundaries(
    bulk_mesh_pt,
-   c1_curviline_boundary_pt);
+   c1_curviline_boundary_pt,
+   boundary_order);
 
   if (rotate_coordinates_on_all_curvilinear_boundaries)
    {

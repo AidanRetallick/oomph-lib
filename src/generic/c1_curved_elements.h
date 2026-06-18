@@ -92,6 +92,13 @@ namespace oomph
      /// Get the values of s at end of parametric curve section
      virtual inline const double& get_s_obar() const =0;
        
+     /// Which edge is curved? Returns an enumeration
+     /// defined in C1PlateHelper::CurvedEdgeEnumeration
+     /// if it's C1PlateHelper::CurvedEdgeEnumeration::none
+     /// none of the edges are curved.
+     virtual inline const C1PlateHelper::CurvedEdgeEnumeration curved_edge()
+      const =0;
+     
      /// hierher Aidan comments!
      virtual void coordinate_x(const Vector<double>& s,
                                Vector<double>& fk) const = 0;
@@ -263,7 +270,10 @@ namespace oomph
       ~BernadouElementBasis() {}
 
       // Private copy and assign - so this should cause a compilation error
+
+     
     private:
+     
       /// Broken copy constructor
       BernadouElementBasis(BernadouElementBasis& dummy)
       {
@@ -293,6 +303,15 @@ namespace oomph
         return Vertices;
       }
 
+     /// Which edge is curved? Returns an enumeration
+     /// defined in C1PlateHelper::CurvedEdgeEnumeration
+     /// if it's C1PlateHelper::CurvedEdgeEnumeration::none
+     /// none of the edges are curved.
+     inline const C1PlateHelper::CurvedEdgeEnumeration curved_edge() const
+      {
+       return Curved_edge;
+      }
+     
       /// Get the values of s at start of parametric curve section
       inline const double& get_s_ubar() const
       {

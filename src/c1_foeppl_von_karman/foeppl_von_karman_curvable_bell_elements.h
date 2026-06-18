@@ -191,19 +191,18 @@ namespace oomph
         // anything else
         if (!right_ui_pinned && !right_data_used[right_ui_index])
         {
-          // [zdec] debug
-          std::cout << "eqn " << condition_index
-		    << " depends on dof R" << right_ui_index
-                    << std::endl;
+          // // [zdec] debug
+          // std::cout << "eqn " << condition_index
+	  //           << " depends on dof R" << right_ui_index
+          //           << std::endl;
           right_data_used[right_ui_index] = true;
         }
         else if (!left_ui_pinned && !left_data_used[left_ui_index])
         {
-          // [zdec] debug
-
-          std::cout << "eqn " << condition_index
-		    << " depends on dof L" << left_ui_index
-                    << std::endl;
+          // // [zdec] debug
+          // std::cout << "eqn " << condition_index
+	  //           << " depends on dof L" << left_ui_index
+          //           << std::endl;
           left_data_used[left_ui_index] = true;
         }
 	else
@@ -255,19 +254,19 @@ namespace oomph
         // it has one) is sufficiently large (> Orthogonality_tolerance)
         if (!right_dwda_pinned && !right_data_used[right_dwda_index])
         {
-          // [zdec] debug
-          std::cout << "eqn " << condition_index
-		    << " depends on dof R" << right_dwda_index
-                    << std::endl;
+          // // [zdec] debug
+          // std::cout << "eqn " << condition_index
+	  //           << " depends on dof R" << right_dwda_index
+          //           << std::endl;
           right_data_used[right_dwda_index] = true;
           continue;
         }
         if (!left_dwd1_pinned && !left_data_used[left_dwd1_index])
         {
-          // [zdec] debug
-          std::cout << "eqn " << condition_index
-		    << " depends on dof L" << left_dwd1_index
-		    << std::endl;
+          // // [zdec] debug
+          // std::cout << "eqn " << condition_index
+	  //           << " depends on dof L" << left_dwd1_index
+	  //           << std::endl;
           double coeff = jac_of_transform(0, alpha);
           if (fabs(coeff) > Orthogonality_tolerance)
           {
@@ -277,10 +276,10 @@ namespace oomph
         }
         if (!left_dwd2_pinned && !left_data_used[left_dwd2_index])
         {
-          // [zdec] debug
-          std::cout << "eqn " << condition_index
-		    << " depends on dof L" << left_dwd2_index
-		    << std::endl;
+          // // [zdec] debug
+          // std::cout << "eqn " << condition_index
+	  //           << " depends on dof L" << left_dwd2_index
+	  //           << std::endl;
           double coeff = jac_of_transform(1, alpha);
           if (fabs(coeff) > Orthogonality_tolerance)
           {
@@ -351,10 +350,10 @@ namespace oomph
           // it has one) is sufficiently large (> Orthogonality_tolerance)
           if (!right_dwdadb_pinned && !right_data_used[right_dwdadb_index])
           {
-            // [zdec] debug
-            std::cout << "eqn " << condition_index
-		      << " depends on dof R" << right_dwdadb_index
-                      << std::endl;
+            // // [zdec] debug
+            // std::cout << "eqn " << condition_index
+	    //           << " depends on dof R" << right_dwdadb_index
+            //           << std::endl;
             right_data_used[right_dwdadb_index] = true;
             continue;
           }
@@ -363,10 +362,10 @@ namespace oomph
             double coeff = hess_of_transform[0](alpha, beta);
             if (fabs(coeff) > Orthogonality_tolerance)
             {
-              // [zdec] debug
-              std::cout << "eqn " << condition_index
-			<< " depends on dof L" << left_dwd1_index
-			<< std::endl;
+              // // [zdec] debug
+              // std::cout << "eqn " << condition_index
+	      //   	<< " depends on dof L" << left_dwd1_index
+	      //   	<< std::endl;
               left_data_used[left_dwd1_index] = true;
               continue;
             }
@@ -376,10 +375,10 @@ namespace oomph
             double coeff = hess_of_transform[1](alpha, beta);
             if (fabs(coeff) > Orthogonality_tolerance)
             {
-              // [zdec] debug
-              std::cout << "eqn " << condition_index
-			<< " depends on dof L" << left_dwd2_index
-			<< std::endl;
+              // // [zdec] debug
+              // std::cout << "eqn " << condition_index
+	      //   	<< " depends on dof L" << left_dwd2_index
+	      //   	<< std::endl;
               left_data_used[left_dwd2_index] = true;
               continue;
             }
@@ -390,10 +389,10 @@ namespace oomph
               jac_of_transform(0, alpha) * jac_of_transform(0, beta);
             if (fabs(coef) > Orthogonality_tolerance)
             {
-              // [zdec] debug
-              std::cout << "eqn " << condition_index
-			<< " depends on dof L" << left_dwd1d1_index
-			<< std::endl;
+              // // [zdec] debug
+              // std::cout << "eqn " << condition_index
+	      //   	<< " depends on dof L" << left_dwd1d1_index
+	      //   	<< std::endl;
               left_data_used[left_dwd1d1_index] = true;
               continue;
             }
@@ -405,10 +404,10 @@ namespace oomph
               jac_of_transform(1, alpha) * jac_of_transform(0, beta);
             if (fabs(coef) > Orthogonality_tolerance)
             {
-              // [zdec] debug
-              std::cout << "eqn " << condition_index
-			<< " depends on dof L" << left_dwd1d2_index
-			<< std::endl;
+              // // [zdec] debug
+              // std::cout << "eqn " << condition_index
+	      //   	<< " depends on dof L" << left_dwd1d2_index
+	      //   	<< std::endl;
               left_data_used[left_dwd1d2_index] = true;
               continue;
             }
@@ -419,10 +418,10 @@ namespace oomph
               jac_of_transform(1, alpha) * jac_of_transform(1, beta);
             if (fabs(coef) > Orthogonality_tolerance)
             {
-              // [zdec] debug
-              std::cout << "eqn " << condition_index
-			<< " depends on dof L" << left_dwd2d2_index
-			<< std::endl;
+              // // [zdec] debug
+              // std::cout << "eqn " << condition_index
+	      //   	<< " depends on dof L" << left_dwd2d2_index
+	      //   	<< std::endl;
               left_data_used[left_dwd2d2_index] = true;
               continue;
             }

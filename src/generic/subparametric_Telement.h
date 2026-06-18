@@ -853,15 +853,15 @@ Elements.",
       switch (boundary_order)
       {
         case 3:
-          // [zdec] debug
-         oomph_info << "Upgrading to a 3-er" << std::endl; // hierher Aidan: also get rid off all these outputs
+         //  // [zdec] debug
+         // oomph_info << "Upgrading to a 3-er" << std::endl; // hierher Aidan: also get rid off all these outputs
           add_new_curved_basis<BernadouElementBasis<3>>();
           // new_integral_pt = new TGauss<2, 13>;
           new_integral_pt = new TGauss<2, 5>;
           break;
         case 5:
-          // [zdec] debug
-          oomph_info << "Upgrading to a 5-er" << std::endl;
+          // // [zdec] debug
+          // oomph_info << "Upgrading to a 5-er" << std::endl;
           add_new_curved_basis<BernadouElementBasis<5>>();
           // [zdec] INTEGRATION SCHEME HAS EXTERNAL KNOTS
           // new_integral_pt = new TGauss<2, 16>;
