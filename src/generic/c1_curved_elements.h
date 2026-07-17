@@ -40,7 +40,7 @@ namespace oomph
 {
 
 
-    // [zdec] I see no point in having this base class? // hierher Aidan: Let's kill it then...
+    // [zdec] Is the whole point of this to have a template free base?
     class BernadouElementBasisBase
     {
     public:
@@ -53,6 +53,13 @@ namespace oomph
 
       /// Shorthand for a vector of vectors containining the vertices
       typedef Vector<Vector<double>> VertexList;
+
+      /// [zdec] Public function to compare the original and my rewrite of the
+      /// "D" matrix handling local to global mapping.
+      virtual void compare_D_matrix(DenseMatrix<double>& old_l2g,
+                                    DenseMatrix<double>& new_l2g,
+				    DenseMatrix<double>& diff_l2g,
+				    const unsigned& version) const = 0;
 
       /// Get the basis for the  unknowns
       virtual void shape(const Vector<double>& s,
@@ -970,6 +977,10 @@ namespace oomph
       /// Padded shape functions for normal derivative trace on (curved) side 3
       Vector<double> g_3(const S_basic_node& s0) const;
 
+      /// [zdec] My rewrite of the local to global mapping matrix
+      void aidans_local_to_global_matrix(DenseMatrix<double>& l2g,
+					 const unsigned& version) const;
+
       /// Fill in matrix that transforms the global dofs to the local dofs
       void local_to_global_matrix(DenseMatrix<double>& l2g) const;
 
@@ -1004,21 +1015,18 @@ namespace oomph
 
 
     public: // hierher remove when testing is done; this used to be protected
-     
+
+      /// [zdec] Public function to compare the original and my rewrite of the
+      /// "D" matrix handling local to global mapping.
+      virtual void compare_D_matrix(DenseMatrix<double>& old_l2g,
+                                    DenseMatrix<double>& new_l2g,
+				    DenseMatrix<double>& diff_l2g,
+				    const unsigned& version) const;
+
       /// \short Get full basis for a generic (BOUNDARY_ORDER+4)th order
       /// bivariate polynomial: i.e 36 basis monomials for generic p7 polynomial
       /// ;   55 basis monomials for generic p9 polynomial.
       void full_basis_monomials(const Vector<double>& s, Shape& pn) const;
-
-      /// Get full basis for the basic element
-      void full_basic_polynomials(const Vector<double>& s, Shape& pn) const;
-
-      /// Get first derivatives of full basis for the basic element
-      void dfull_basic_polynomials(const Vector<double>& s, DShape& dpn) const;
-
-      /// Get second derivatives of full basis for the basic element
-      void d2full_basic_polynomials(const Vector<double>& s,
-                                    DShape& d2pn) const;
 
       /// \short Get first derivatives of the 36(55) basis monomials for generic
       /// p7(9) polynomial
@@ -1028,6 +1036,199 @@ namespace oomph
       /// generic
       // p7(9) polynomial
       void d2full_basis_monomials(const Vector<double>& s, DShape& d2p7) const;
+
+      /// Get full basis for the basic element
+      void full_basic_polynomials(const Vector<double>& s, Shape& pn) const;
+
+      /// Wrapper for full basis for the basic element that permutes ordering
+      void full_basic_polynomials(const Vector<double>& s,
+				  Shape& pn,
+				  const bool& reenum) const;
+
+      /// Get first derivatives of full basis for the basic element
+      void dfull_basic_polynomials(const Vector<double>& s, DShape& dpn) const;
+
+      /// Wrapper for full dbasis for the basic element that permutes ordering
+      void dfull_basic_polynomials(const Vector<double>& s,
+				  DShape& dpn,
+				  const bool& reenum) const;
+
+      /// Get second derivatives of full basis for the basic element
+      void d2full_basic_polynomials(const Vector<double>& s,
+                                    DShape& d2pn) const;
+
+      /// Wrapper for full d2basis for the basic element that permutes ordering
+      void d2full_basic_polynomials(const Vector<double>& s,
+				    DShape& d2pn,
+				    const bool& reenum) const;
+
+      /// Get the complete basic polynomial basis and its first and second
+      /// derivatives with respect to the global Eulerian coordinates.
+      ///
+      /// s is supplied in the element's local coordinate system.
+      /// The basis functions are returned in the re-enumerated basic-basis
+      /// ordering.
+      ///
+      /// Derivative storage:
+      ///   ddx_psi(i, 0)     = d psi_i / dx
+      ///   ddx_psi(i, 1)     = d psi_i / dy
+      ///
+      ///   d2dx2_psi(i, 0)   = d2 psi_i / dx2
+      ///   d2dx2_psi(i, 1)   = d2 psi_i / dx dy
+      ///   d2dx2_psi(i, 2)   = d2 psi_i / dy2
+      void d2dx2_full_basic_polynomials(
+	const Vector<double>& s,
+	Shape& psi,
+	DShape& ddx_psi,
+	DShape& d2dx2_psi) const
+      {
+#ifdef PARANOID
+	if (Curved_edge == C1PlateHelper::CurvedEdgeEnumeration::none)
+	{
+	  throw OomphLibError("The element has not been upgraded yet. "
+			      "Did you forget to set the curved edge?",
+			      OOMPH_CURRENT_FUNCTION,
+			      OOMPH_EXCEPTION_LOCATION);
+	}
+#endif
+
+        // Number of functions in the complete basic polynomial basis:
+        // 36 for BOUNDARY_ORDER == 3;
+        // 55 for BOUNDARY_ORDER == 5.
+        const unsigned nbasic = n_basic_basis_functions();
+
+        // The geometry routines and the unpermuted basic basis use the
+        // canonical basic-element orientation.
+        Vector<double> s_basic(s);
+        permute_shape(s_basic);
+
+        // Derivatives with respect to the basic coordinates.
+        DShape dpsi_ds(nbasic, 2);
+        DShape d2psi_ds2(nbasic, 3);
+
+        // Evaluate the complete basic basis and its local derivatives.
+        //
+        // true requests the re-enumerated ordering used by the rest of the
+        // curved-element construction.
+        full_basic_polynomials(s_basic, psi);
+        dfull_basic_polynomials(s_basic, dpsi_ds);
+        d2full_basic_polynomials(s_basic, d2psi_ds2);
+
+        // Jacobian:
+        //
+        //   jacobian(alpha, beta) = dx_alpha / ds_beta
+        //
+        // and its inverse:
+        //
+        //   inv_jacobian(alpha, beta) = ds_alpha / dx_beta
+        DenseMatrix<double> jacobian(2, 2, 0.0);
+        DenseMatrix<double> inv_jacobian(2, 2, 0.0);
+
+        // Hessian of the curved coordinate mapping:
+        //
+        //   hessian(alpha, beta, gamma)
+        //     = d2 x_alpha / (ds_beta ds_gamma)
+        RankThreeTensor<double> hessian(2, 2, 2, 0.0);
+
+        // Derivative of the inverse Jacobian:
+        //
+        //   d_inv_jac_ds(alpha, beta, gamma)
+        //     = d/ds_gamma (ds_alpha / dx_beta)
+        RankThreeTensor<double> d_inv_jac_ds(2, 2, 2, 0.0);
+
+        get_basic_jacobian(s_basic, jacobian);
+        get_basic_hessian(s_basic, hessian);
+
+        invert_two_by_two(jacobian, inv_jacobian);
+
+        // Resize and initialise output derivative containers.
+        ddx_psi.resize(nbasic, 2);
+        d2dx2_psi.resize(nbasic, 3);
+
+        for (unsigned i = 0; i < nbasic; ++i)
+        {
+          for (unsigned alpha = 0; alpha < 2; ++alpha)
+          {
+            ddx_psi(i, alpha) = 0.0;
+          }
+
+          for (unsigned alpha = 0; alpha < 3; ++alpha)
+          {
+            d2dx2_psi(i, alpha) = 0.0;
+          }
+        }
+
+        // Differentiate the inverse-Jacobian identity:
+        //
+        //   d(J^-1)/ds_zeta
+        //       = -J^-1 (dJ/ds_zeta) J^-1.
+        //
+        // Since the derivative of J is the Hessian of the coordinate mapping,
+        //
+        // d_inv_jac_ds(alpha, delta, zeta)
+        //   = - inv_jacobian(alpha, beta)
+        //       hessian(beta, gamma, zeta)
+        //       inv_jacobian(gamma, delta).
+        for (unsigned alpha = 0; alpha < 2; ++alpha)
+        {
+          for (unsigned beta = 0; beta < 2; ++beta)
+          {
+            for (unsigned gamma = 0; gamma < 2; ++gamma)
+            {
+              for (unsigned delta = 0; delta < 2; ++delta)
+              {
+                for (unsigned zeta = 0; zeta < 2; ++zeta)
+                {
+                  d_inv_jac_ds(alpha, delta, zeta) -=
+                    inv_jacobian(alpha, beta) * hessian(beta, gamma, zeta) *
+                    inv_jacobian(gamma, delta);
+                }
+              }
+            }
+          }
+        }
+
+        // Transform first derivatives:
+        //
+        //   d psi / dx_beta
+        //     = d psi / ds_alpha
+        //       ds_alpha / dx_beta.
+        for (unsigned alpha = 0; alpha < 2; ++alpha)
+        {
+          for (unsigned beta = 0; beta < 2; ++beta)
+          {
+            for (unsigned i = 0; i < nbasic; ++i)
+            {
+              ddx_psi(i, beta) += dpsi_ds(i, alpha) * inv_jacobian(alpha, beta);
+            }
+          }
+        }
+
+        // Transform second derivatives.
+        //
+        // This follows the same chain-rule implementation and index convention
+        // used in d2_shape_dx2().
+        for (unsigned alpha = 0; alpha < 2; ++alpha)
+        {
+          for (unsigned beta = alpha; beta < 2; ++beta)
+          {
+            for (unsigned gamma = 0; gamma < 2; ++gamma)
+            {
+              for (unsigned delta = 0; delta < 2; ++delta)
+              {
+                for (unsigned i = 0; i < nbasic; ++i)
+                {
+                  d2dx2_psi(i, alpha + beta) +=
+                    d2psi_ds2(i, gamma + delta) * inv_jacobian(gamma, alpha) *
+                      inv_jacobian(delta, beta) +
+                    dpsi_ds(i, gamma) * d_inv_jac_ds(gamma, beta, delta) *
+                      inv_jacobian(delta, alpha);
+                }
+              }
+            }
+          }
+        }
+      }
 
       /// Get the basis functions at basic coordinate s
       void shape_basic(const Vector<double>& s, Shape& psi, Shape& bpsi) const;
@@ -1407,7 +1608,7 @@ definitions.",
       const double diff0 = sqrt(pow(vertex_0[0] - Vertices[0][0], 2) +
                                 pow(vertex_0[1] - Vertices[0][1], 2));
       const double diff1 = sqrt(pow(vertex_1[0] - Vertices[1][0], 2) +
-                                pow(vertex_0[1] - Vertices[0][1], 2));
+                                pow(vertex_1[1] - Vertices[1][1], 2));
       const bool vertices_differ_from_curve = diff0 > tol || diff1 > tol;
 
       // The parametric curve does not start and end at the vertices.
@@ -1431,8 +1632,8 @@ definitions.",
       // Lengths of the vectors
       const double lA1 = sqrt(A1(0) * A1(0) + A1(1) * A1(1)),
                    lA2 = sqrt(A2(0) * A2(0) + A2(1) * A2(1)),
-                   lB1 = sqrt(A1(0) * A1(0) + A1(1) * A1(1)),
-                   lB2 = sqrt(A2(0) * A2(0) + A2(1) * A2(1));
+                   lB1 = sqrt(B1(0) * B1(0) + B1(1) * B1(1)),
+                   lB2 = sqrt(B2(0) * B2(0) + B2(1) * B2(1));
 
       // Check lengths
       if (fabs(lA1) < tol || fabs(lB2) < tol)

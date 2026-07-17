@@ -364,11 +364,211 @@ namespace oomph
       }
     }
 
+    /// [zdec] My function to handle comparison of the original and new D matrix
+    template<unsigned BOUNDARY_ORDER>
+    void BernadouElementBasis<BOUNDARY_ORDER>::compare_D_matrix(
+      DenseMatrix<double>& old_l2g,
+      DenseMatrix<double>& new_l2g,
+      DenseMatrix<double>& diff_l2g,
+      const unsigned& version) const
+    {
+      local_to_global_matrix(old_l2g);
+      aidans_local_to_global_matrix(new_l2g, version);
+      unsigned n = new_l2g.nrow();
+      unsigned m = new_l2g.ncol();
+      diff_l2g.resize(n, m, 0.0);
+      for(unsigned i = 0; i < n; i++)
+      {
+        for(unsigned j = 0; j < m; j++)
+        {
+          diff_l2g(i, j) = new_l2g(i, j) - old_l2g(i, j);
+        }
+      }
+    }
+
+
+    /// [zdec] My local to global rewrite the local to global mapping. The dofs
+    /// are directional derivatives left in a gradient (dot) direction form:
+    ///   Dw * A   or   D2w * [AxB]
+    /// where 'D' is the gradient, '*' is the inner product, and 'x' is the
+    /// tensor (outer) product.
+    ///
+    /// Local dofs (in order):
+    /// | w(a1), w(a2), w(a3),
+    /// | Dw*[A1](a1), Dw*[A2](a1), Dw*[B1](a2), Dw*B2(a2), Dw*C1(a3), Dw*C2(a3),
+    /// | D2w*[A1xA1](a1), D2w*[A2xA2](a1),
+    /// | D2w*[B1xB1](a2), D2w*[B2xB2](a2),
+    /// | D2w*[C1xC1](a3), D2w*[C2xC2](a3),  (!! C1/C2 order switched in lit but not in code)
+    /// | D2w*[B2xB2](a1), D2w*[A1xA1](a2), D2w*[A2xB1](a3)
+    /// | w(ei) (where i = 1,...,3  for BOUNDARY_ORDER = 3,
+    /// |              i = 1,...,10 for BOUNDARY_ORDER = 5)
+    /// Here, ai are the nodes, and ei are the internal points. The vectors
+    /// Aj, Bj, and Cj are the tangent vectors to nodes a1, a2, and a3 resp.
+    /// Note: C1 = -B2, and C2 = -A1
+    ///
+    /// Global dofs (in order):
+    /// | w(a1), w(a2), w(a3),
+    /// | dwdx(a1), dwdy(a1), d2wdx2(a1), d2wdxdy(a1), d2wdy2(a1)
+    /// | dwdx(a2), dwdy(a2), d2wdx2(a2), d2wdxdy(a2), d2wdy2(a2)
+    /// | dwdx(a3), dwdy(a3), d2wdx2(a3), d2wdxdy(a3), d2wdy2(a3)
+    /// | w(ei) (where i = 1,...,3  for BOUNDARY_ORDER = 3,
+    /// |              i = 1,...,10 for BOUNDARY_ORDER = 5)
+    /// which is the global hermite data.
+    ///
+    /// [zdec] There are numerous inconsistancies with signs and dof orders.
+    /// These are mainly convention, however we need to make sure that the same
+    /// convention is used betewen the B and D matrices. Some notes are:
+    /// - Local dofs for a3 first derivatives are swapped in notes.
+    /// - Final 3 local Hermite dofs (opposite edge tangents) seem to be out
+    ///   by a minus sign.
+    /// - The final a3 local Hermite dof has inconsistant sign in notes.
+    ///
+    /// The magic number "version" allows to choose between which convention is
+    /// used for tangent vectors of the opposite edge.
+    ///   version = 1 <- consistent with David's code
+    ///   version = 2 <- consistent with the arguments in the derivation
+    ///   version = 3 <- consistent with David's thesis
+    ///
+    template<unsigned BOUNDARY_ORDER>
+    void BernadouElementBasis<BOUNDARY_ORDER>::aidans_local_to_global_matrix(
+      DenseMatrix<double>& d,
+      const unsigned& version) const
+    {
+      // -- Submatrices --
+      // First three blocks relate first derivatives in each basis
+      DenseMatrix<double> d1(2, 2, 0.0);
+      DenseMatrix<double> d2(2, 2, 0.0);
+      DenseMatrix<double> d3(2, 2, 0.0);
+      // Last block relates second derivatives
+      DenseMatrix<double> d4(9, 9, 0.0);
+
+      // Local tangent directions for derivatives
+      Vector<double> t_A1 = {A1(0), A1(1)};
+      Vector<double> t_A2 = {A2(0), A2(1)};
+      Vector<double> t_B1 = {B1(0), B1(1)};
+      Vector<double> t_B2 = {B2(0), B2(1)};
+      Vector<double> t_C1 = {-B2(0), -B2(1)};
+      Vector<double> t_C2 = {-A1(0), -A1(1)};
+      Vector<double> minus_t_A2 = {-A2(0), -A2(1)};
+      // Array-likes for looping 1st deriv tangent vectors
+      Vector<Vector<double>> t_1 = {t_A1, t_A2};
+      Vector<Vector<double>> t_2 = {t_B1, t_B2};
+      // Vector<Vector<double>> t_3 = {t_C2, t_C1};  // [zdec] order switched in
+      Vector<Vector<double>> t_3 = {t_C1, t_C2};     // lit but not in old code
+      // Array-likes for looping 2nd deriv tangent tensors
+      // (tangent tensors defined by two tangent vectors)
+      Vector<Vector<Vector<double>>>
+	t2_1(3, Vector<Vector<double>>(2, {0.0, 0.0}));
+      Vector<Vector<Vector<double>>>
+	t2_2(3, Vector<Vector<double>>(2, {0.0, 0.0}));
+      Vector<Vector<Vector<double>>>
+	t2_3(3, Vector<Vector<double>>(2, {0.0, 0.0}));
+      switch(version)
+      {
+      case 1:
+	t2_1 = {{t_A1, t_A1}, {t_A2, t_A2}, {t_B2, t_B2}};
+	t2_2 = {{t_B1, t_B1}, {t_B2, t_B2}, {t_A1, t_A1}};
+        t2_3 = {{t_C1, t_C1}, {t_C2, t_C2}, {minus_t_A2, t_B1}};
+        break;
+        // [zdec] Above choices are consistent with Davids *code* for now.
+        // However there is uncertainty re: the signs for the third pair in each
+        // set. The natural choices (choosing opposite edge tangents) leads to
+        // an extra minus sign in each third pair:
+      case 2:
+	t2_1 = {{t_A1, t_A1}, {t_A2, t_A2}, {t_B2, t_C1}}; // t_C1 = -t_B2
+	t2_2 = {{t_B1, t_B1}, {t_B2, t_B2}, {t_C2, t_A1}}; // t_C2 = -t_A1
+        t2_3 = {{t_C1, t_C1}, {t_C2, t_C2}, {t_A2, t_B1}};
+        break;
+        // whereas David's the *thesis* suggests all should be positive:
+      case 3:
+	t2_1 = {{t_A1, t_A1}, {t_A2, t_A2}, {t_B2, t_B2}};
+	t2_2 = {{t_B1, t_B1}, {t_B2, t_B2}, {t_A1, t_A1}};
+        t2_3 = {{t_C1, t_C1}, {t_C2, t_C2}, {t_A2, t_B1}};
+      }
+
+      // Fill d1, d2, d3 blocks; responsible for relating first derivatives
+      for(unsigned alpha = 0; alpha < 2; alpha++)
+      {
+        for (unsigned beta = 0; beta < 2; beta++)
+        {
+	  d1(alpha, beta) = t_1[beta][alpha];
+	  d2(alpha, beta) = t_2[beta][alpha];
+          d3(alpha, beta) = t_3[beta][alpha];
+        }
+      } // End of d1, d2, d3
+
+      // Fill d4 block; responsible for relating second derivatives
+      // [zdec] Remove the loops and make this explicit
+      for(unsigned alpha = 0; alpha < 2; alpha++)
+      {
+        for (unsigned beta = 0; beta < 2; beta++)
+        {
+          // Row determined by global components
+          unsigned i = alpha + beta;
+          for (unsigned j = 0; j < 3; j++)
+          {
+            // j2 is a proxy index which is modified when j=2
+            unsigned j2 = j;
+            // Third column of da is offset by 4, so if j==2, add 4
+            j2 = j + 4 * (j == 2);
+            // da block for sectors2nd derivs at first node
+            d4(0+i, 0+j2) += t2_1[j][0][alpha] * t2_1[j][1][beta];
+            // Third column of db is offset by 3
+            j2 = j + 3 * (j == 2);
+            // db block for 2nd derivs at second node
+            d4(3+i, 2+j2) += t2_2[j][0][alpha] * t2_2[j][1][beta];
+            // Third column of dc is offset by 2
+            j2 = j + 2 * (j == 2);
+            // dc block for 2nd derivs at third node
+            d4(6+i, 4+j2) += t2_3[j][0][alpha] * t2_3[j][1][beta];
+          }
+        }
+      }
+
+      // Fill out D matrix
+      unsigned ninternal_dofs = n_internal_dofs();
+      unsigned ndofs = 18 + ninternal_dofs;
+      d.resize(ndofs, ndofs, 0.0);
+      // First block maps nodal Lagrange -> Lagrange: unchanged
+      for(unsigned i = 0; i < 3; i++)
+      {
+        d(i, i) = 1.0;
+      }
+      // Next three blocks map first derivatives: d1, d2, d3
+      for(unsigned i = 0; i < 2; i++)
+      {
+        for(unsigned j = 0; j < 2; j++)
+        {
+          d(3+i, 3+j) = d1(i, j);
+          d(5+i, 5+j) = d2(i, j);
+          d(7+i, 7+j) = d3(i, j);
+        }
+      }
+      // Next block maps second derivatives: d4
+      for(unsigned i = 0; i < 9; i++)
+      {
+        for(unsigned j = 0; j < 9; j++)
+        {
+          d(9+i, 9+j) = d4(i, j);
+        }
+      }
+      // Last block maps internal Lagrange -> Lagrange: unchanged
+      for(unsigned i = 0; i < ninternal_dofs; i++)
+      {
+        d(18+i, 18+i) = 1.0;
+      }
+    }
+
+
     /// The matrix that transforms the global dofs to the local dofs
     template<unsigned BOUNDARY_ORDER>
     void BernadouElementBasis<BOUNDARY_ORDER>::local_to_global_matrix(
       DenseMatrix<double>& d) const
     {
+      // Temporarily redirect to mine
+      aidans_local_to_global_matrix(d, 1);
+      return;
+
       // Converts global dofs:
       // w(ai) Dw(xj)(ai) D2 w(xj,xk)(ai) w(ei) with ai in {a1,a2,a3} and xj,xk
       // in {x1,x2} to w(ai) Dw(t[i]j)(ai) D2 w(t[i]j,t[i]j)(ai)
@@ -397,6 +597,10 @@ namespace oomph
         d3(i, 1) = -A1(i); // C2=-B1
 
         //  Matrix for second derivatives
+
+	// [zdec] POSSIBLE ERROR HERE. Third rows seem to have minus signs
+	// swapped with the natural choices which would be -B2*B2, -A1*A1, and
+	// +A2*B1. In Davids thesis, all three are positive, also unnatural.
         for (unsigned j = 0; j < 2; ++j)
         {
           // at node 0

@@ -90,6 +90,40 @@ namespace oomph
       }
     }
 
+    /// [zdec] PERMUTED Precomputed basis polynomials for the 3rd order boundary representation
+    template<>
+    void BernadouElementBasis<3>::full_basic_polynomials(
+      const Vector<double>& s, Shape& phi, const bool& reenum) const
+    {
+      full_basic_polynomials(s, phi);
+      // Reenumerate the basic polynomials
+      if(reenum)
+      {
+	const unsigned n = n_basic_basis_functions();
+	Shape temp(n);
+	for(unsigned i = 0; i < n; i++)
+	{
+	  temp(i) = phi(i);
+	}
+	// phi(23) = temp(25);
+	// phi(24) = temp(26);
+	// phi(25) = temp(29);
+	// phi(26) = temp(30);
+	// phi(27) = temp(23);
+	// phi(28) = temp(24);
+	// phi(29) = temp(27);
+	// phi(30) = temp(28);
+	phi(25) = temp(23);
+	phi(26) = temp(24);
+	phi(29) = temp(25);
+	phi(30) = temp(26);
+	phi(23) = temp(27);
+	phi(24) = temp(28);
+	phi(27) = temp(29);
+	phi(28) = temp(30);
+      }
+    }
+
     /// Precomputed dbasis polynomials for the 3rd order boundary representation
     /// hierher dbasis =  derivatives?
     template<>
@@ -97,7 +131,7 @@ namespace oomph
       const Vector<double>& s, DShape& dphi) const
     {
      // hierher pause("in BernadouElementBasis<3>::dfull_basic_polynomials");
-          
+
       // This will be replaced eventually - in favour of the explicit shape
       // functions
       // Get the number of basic basis function
@@ -120,6 +154,48 @@ namespace oomph
           {
             dphi(i, alpha) += a_matrix(i, j) * dp7(j, alpha);
           }
+        }
+      }
+    }
+
+    /// [zdec] PERMUTED Precomputed dbasis polynomials for the 3rd order boundary representation
+    /// hierher dbasis =  derivatives?
+    template<>
+    void BernadouElementBasis<3>::dfull_basic_polynomials(
+      const Vector<double>& s, DShape& dphi, const bool& reenum) const
+    {
+      dfull_basic_polynomials(s, dphi);
+      // Reenumerate the basic polynomials
+      if(reenum)
+      {
+	const unsigned n = n_basic_basis_functions();
+	const unsigned m = 2;
+	DShape temp(n, m);
+        for (unsigned i = 0; i < n; i++)
+	{
+	  for (unsigned j = 0; j < m; j++)
+          {
+            temp(i, j) = dphi(i, j);
+          }
+        }
+	for (unsigned j = 0; j < m; j++)
+	{
+          // dphi(23, j) = temp(25, j);
+          // dphi(24, j) = temp(26, j);
+          // dphi(25, j) = temp(29, j);
+          // dphi(26, j) = temp(30, j);
+          // dphi(27, j) = temp(23, j);
+          // dphi(28, j) = temp(24, j);
+          // dphi(29, j) = temp(27, j);
+	  // dphi(30, j) = temp(28, j);
+	  dphi(25, j) = temp(23, j);
+	  dphi(26, j) = temp(24, j);
+          dphi(29, j) = temp(25, j);
+          dphi(30, j) = temp(26, j);
+          dphi(23, j) = temp(27, j);
+          dphi(24, j) = temp(28, j);
+          dphi(27, j) = temp(29, j);
+          dphi(28, j) = temp(30, j);
         }
       }
     }
@@ -160,6 +236,48 @@ namespace oomph
         }
       }
     }
+
+    /// [zdec] PERMUTED Precomputed d2basis polynomials for the 3rd order boundary representation
+    template<>
+    void BernadouElementBasis<3>::d2full_basic_polynomials(
+      const Vector<double>& s, DShape& d2phi, const bool& reenum) const
+    {
+      d2full_basic_polynomials(s, d2phi);
+      // Reenumerate the basic polynomials
+      if(reenum)
+      {
+	const unsigned n = n_basic_basis_functions();
+	const unsigned m = 3;
+	DShape temp(n, m);
+        for (unsigned i = 0; i < n; i++)
+	{
+	  for (unsigned j = 0; j < m; j++)
+          {
+            temp(i, j) = d2phi(i, j);
+          }
+        }
+	for (unsigned j = 0; j < m; j++)
+	{
+          // d2phi(23, j) = temp(25, j);
+          // d2phi(24, j) = temp(26, j);
+          // d2phi(25, j) = temp(29, j);
+          // d2phi(26, j) = temp(30, j);
+          // d2phi(27, j) = temp(23, j);
+          // d2phi(28, j) = temp(24, j);
+          // d2phi(29, j) = temp(27, j);
+          // d2phi(30, j) = temp(28, j);
+	  d2phi(25, j) = temp(23, j);
+	  d2phi(26, j) = temp(24, j);
+          d2phi(29, j) = temp(25, j);
+          d2phi(30, j) = temp(26, j);
+          d2phi(23, j) = temp(27, j);
+          d2phi(24, j) = temp(28, j);
+          d2phi(27, j) = temp(29, j);
+          d2phi(28, j) = temp(30, j);
+        }
+      }
+    }
+
 
     /// Precomputed basis polynomials for the 5th order boundary representation
     template<>
@@ -3186,6 +3304,174 @@ namespace oomph
         (5 - 16 * s - 138 * t + 390 * s * t + 17 * s_p_2 - 360 * t * s_p_2 -
          6 * s_p_3 + 108 * t * s_p_3 + 678 * t_p_2 - 1332 * s * t_p_2 +
          648 * s_p_2 * t_p_2 - 1080 * t_p_3 + 1080 * s * t_p_3 + 540 * t_p_4);
+    }
+
+
+
+    /// [zdec] PERMUTED Precomputed basis polynomials for the 3rd order boundary representation
+    template<>
+    void BernadouElementBasis<5>::full_basic_polynomials(
+      const Vector<double>& s, Shape& phi, const bool& reenum) const
+    {
+      full_basic_polynomials(s, phi);
+      // Reenumerate the basic polynomials
+      if(reenum)
+      {
+	const unsigned n = n_basic_basis_functions();
+	Shape temp(n);
+	for(unsigned i = 0; i < n; i++)
+	{
+	  temp(i) = phi(i);
+	}
+	// phi(25) = temp(29);
+	// phi(26) = temp(30);
+	// phi(27) = temp(31);
+	// phi(28) = temp(32);
+	// phi(29) = temp(37);
+	// phi(30) = temp(38);
+	// phi(31) = temp(39);
+	// phi(32) = temp(40);
+	// phi(33) = temp(25);
+	// phi(34) = temp(26);
+	// phi(35) = temp(27);
+	// phi(36) = temp(28);
+	// phi(37) = temp(33);
+	// phi(38) = temp(34);
+	// phi(39) = temp(35);
+	// phi(40) = temp(36);
+	phi(29) = temp(25);
+	phi(30) = temp(26);
+	phi(31) = temp(27);
+	phi(32) = temp(28);
+	phi(37) = temp(29);
+	phi(38) = temp(30);
+	phi(39) = temp(31);
+	phi(40) = temp(32);
+	phi(25) = temp(33);
+	phi(26) = temp(34);
+	phi(27) = temp(35);
+	phi(28) = temp(36);
+	phi(33) = temp(37);
+	phi(34) = temp(38);
+	phi(35) = temp(39);
+	phi(36) = temp(40);
+      }
+    }
+
+    /// [zdec] PERMUTED Precomputed dbasis polynomials for the 3rd order boundary representation
+    /// hierher dbasis =  derivatives?
+    template<>
+    void BernadouElementBasis<5>::dfull_basic_polynomials(
+      const Vector<double>& s, DShape& dphi, const bool& reenum) const
+    {
+      dfull_basic_polynomials(s, dphi);
+      // Reenumerate the basic polynomials
+      if(reenum)
+      {
+	const unsigned n = n_basic_basis_functions();
+	const unsigned m = 2;
+	DShape temp(n, m);
+        for (unsigned i = 0; i < n; i++)
+	{
+	  for (unsigned j = 0; j < m; j++)
+          {
+            temp(i, j) = dphi(i, j);
+          }
+        }
+	for (unsigned j = 0; j < m; j++)
+	{
+          // dphi(25, j) = temp(29, j);
+          // dphi(26, j) = temp(30, j);
+          // dphi(27, j) = temp(31, j);
+          // dphi(28, j) = temp(32, j);
+          // dphi(29, j) = temp(37, j);
+          // dphi(30, j) = temp(38, j);
+          // dphi(31, j) = temp(39, j);
+          // dphi(32, j) = temp(40, j);
+          // dphi(33, j) = temp(25, j);
+          // dphi(34, j) = temp(26, j);
+          // dphi(35, j) = temp(27, j);
+          // dphi(36, j) = temp(28, j);
+          // dphi(37, j) = temp(33, j);
+          // dphi(38, j) = temp(34, j);
+          // dphi(39, j) = temp(35, j);
+	  // dphi(40, j) = temp(36, j);
+	  dphi(29, j) = temp(25, j);
+	  dphi(30, j) = temp(26, j);
+          dphi(31, j) = temp(27, j);
+          dphi(32, j) = temp(28, j);
+          dphi(37, j) = temp(29, j);
+          dphi(38, j) = temp(30, j);
+          dphi(39, j) = temp(31, j);
+          dphi(40, j) = temp(32, j);
+          dphi(25, j) = temp(33, j);
+          dphi(26, j) = temp(34, j);
+          dphi(27, j) = temp(35, j);
+          dphi(28, j) = temp(36, j);
+          dphi(33, j) = temp(37, j);
+          dphi(34, j) = temp(38, j);
+          dphi(35, j) = temp(39, j);
+          dphi(36, j) = temp(40, j);
+        }
+      }
+    }
+
+    /// [zdec] PERMUTED Precomputed dbasis polynomials for the 3rd order boundary representation
+    /// hierher dbasis =  derivatives?
+    template<>
+    void BernadouElementBasis<5>::d2full_basic_polynomials(
+      const Vector<double>& s, DShape& d2phi, const bool& reenum) const
+    {
+      dfull_basic_polynomials(s, d2phi);
+      // Reenumerate the basic polynomials
+      if(reenum)
+      {
+	const unsigned n = n_basic_basis_functions();
+	const unsigned m = 3;
+	DShape temp(n, m);
+        for (unsigned i = 0; i < n; i++)
+	{
+	  for (unsigned j = 0; j < m; j++)
+          {
+            temp(i, j) = d2phi(i, j);
+          }
+        }
+	for (unsigned j = 0; j < m; j++)
+	{
+          // d2phi(25, j) = temp(29, j);
+          // d2phi(26, j) = temp(30, j);
+          // d2phi(27, j) = temp(31, j);
+          // d2phi(28, j) = temp(32, j);
+          // d2phi(29, j) = temp(37, j);
+          // d2phi(30, j) = temp(38, j);
+          // d2phi(31, j) = temp(39, j);
+          // d2phi(32, j) = temp(40, j);
+          // d2phi(33, j) = temp(25, j);
+          // d2phi(34, j) = temp(26, j);
+          // d2phi(35, j) = temp(27, j);
+          // d2phi(36, j) = temp(28, j);
+          // d2phi(37, j) = temp(33, j);
+          // d2phi(38, j) = temp(34, j);
+          // d2phi(39, j) = temp(35, j);
+          // d2phi(40, j) = temp(36, j);
+	  d2phi(29, j) = temp(25, j);
+	  d2phi(30, j) = temp(26, j);
+          d2phi(31, j) = temp(27, j);
+          d2phi(32, j) = temp(28, j);
+          d2phi(37, j) = temp(29, j);
+          d2phi(38, j) = temp(30, j);
+          d2phi(39, j) = temp(31, j);
+          d2phi(40, j) = temp(32, j);
+          d2phi(25, j) = temp(33, j);
+          d2phi(26, j) = temp(34, j);
+          d2phi(27, j) = temp(35, j);
+          d2phi(28, j) = temp(36, j);
+          d2phi(33, j) = temp(37, j);
+          d2phi(34, j) = temp(38, j);
+          d2phi(35, j) = temp(39, j);
+          d2phi(36, j) = temp(40, j);
+        }
+      }
     }
 
 } // namespace oomph
