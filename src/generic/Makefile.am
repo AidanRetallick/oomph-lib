@@ -15,6 +15,7 @@ Qelements.cc Qspectral_elements.cc frontal_solver.cc      linear_solver.cc \
 Qelement_face_coordinate_translation_schemes.cc \
 Telements.cc hermite_elements.cc   \
 bell_element_basis.cc c1_curved_elements.cc \
+c1_curved_elements_direct.cc \
 c1_curved_basic_basis.cc c1_curved_association_matrix.cc \
 elastic_problems.cc  hijacked_elements.cc      \
 algebraic_elements.cc \
@@ -77,6 +78,7 @@ displacement_control_element.h \
 mesh.h           timesteppers.h  explicit_timesteppers.h \
 hermite_elements.h  nodes.h      oomph_utilities.h \
 bell_element_basis.h c1_curved_elements.h \
+c1_curved_elements_direct.h \
 c1_plate_helper.h subparametric_Telement.h \
 elastic_problems.h  hijacked_elements.h      geom_objects.h \
 algebraic_elements.h            macro_element.h \
