@@ -60,6 +60,152 @@ namespace oomph
   }
 
 
+  /// Set a coefficient vector to zero with the correct global-dof length.
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::zero_global_dof_coefficients(
+    Vector<double>& coefficients) const
+  {
+    coefficients = Vector<double>(this->n_basis_functions(), 0.0);
+  }
+
+
+  /// Copy a coefficient vector into one row of a matrix.
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::put_row(
+    DenseMatrix<double>& matrix,
+    const unsigned& row,
+    const Vector<double>& coefficients)
+  {
+    for (unsigned j = 0; j < coefficients.size(); ++j)
+    {
+      matrix(row, j) = coefficients[j];
+    }
+  }
+
+
+  /// Coefficients of w at a vertex in the global dof vector.
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::vertex_value_coefficients(
+    const unsigned& vertex, Vector<double>& coefficients) const
+  {
+    zero_global_dof_coefficients(coefficients);
+    coefficients[vertex] = 1.0;
+  }
+
+
+  /// Coefficients of a physical directional first derivative
+  /// direction.grad_x(w) at a vertex.
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::
+    vertex_physical_first_derivative_coefficients(
+      const unsigned& vertex,
+      const Vector<double>& direction,
+      Vector<double>& coefficients) const
+  {
+    zero_global_dof_coefficients(coefficients);
+    coefficients[3 + 2 * vertex] = direction[0];
+    coefficients[4 + 2 * vertex] = direction[1];
+  }
+
+
+  /// Coefficients of the physical mixed second derivative
+  /// a^T H_x(w) b at a vertex.
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::
+    vertex_physical_second_derivative_coefficients(
+      const unsigned& vertex,
+      const Vector<double>& a,
+      const Vector<double>& b,
+      Vector<double>& coefficients) const
+  {
+    zero_global_dof_coefficients(coefficients);
+    coefficients[9 + 3 * vertex] = a[0] * b[0];
+    coefficients[10 + 3 * vertex] = a[0] * b[1] + a[1] * b[0];
+    coefficients[11 + 3 * vertex] = a[1] * b[1];
+  }
+
+
+  /// Coefficients of q.grad_s(w) at a vertex.
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::
+    vertex_reference_first_derivative_coefficients(
+      const unsigned& vertex,
+      const Vector<double>& q,
+      Vector<double>& coefficients) const
+  {
+    const double vertex_coordinate[3][2] = {{1.0, 0.0}, {0.0, 1.0}, {0.0, 0.0}};
+
+    Vector<double> s(2);
+    s[0] = vertex_coordinate[vertex][0];
+    s[1] = vertex_coordinate[vertex][1];
+
+    DenseMatrix<double> jacobian(2, 2, 0.0);
+    this->get_basic_jacobian(s, jacobian);
+
+    Vector<double> physical_direction(2, 0.0);
+    for (unsigned i = 0; i < 2; ++i)
+    {
+      physical_direction[i] = jacobian(i, 0) * q[0] + jacobian(i, 1) * q[1];
+    }
+
+    vertex_physical_first_derivative_coefficients(
+      vertex, physical_direction, coefficients);
+  }
+
+
+  /// Coefficients of a^T H_s(w) b at a vertex, including the Hessian of the
+  /// coordinate map.
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::
+    vertex_reference_second_derivative_coefficients(
+      const unsigned& vertex,
+      const Vector<double>& a,
+      const Vector<double>& b,
+      Vector<double>& coefficients) const
+  {
+    const double vertex_coordinate[3][2] = {{1.0, 0.0}, {0.0, 1.0}, {0.0, 0.0}};
+
+    Vector<double> s(2);
+    s[0] = vertex_coordinate[vertex][0];
+    s[1] = vertex_coordinate[vertex][1];
+
+    DenseMatrix<double> jacobian(2, 2, 0.0);
+    RankThreeTensor<double> map_hessian(2, 2, 2, 0.0);
+    this->get_basic_jacobian(s, jacobian);
+    this->get_basic_hessian(s, map_hessian);
+
+    Vector<double> physical_a(2, 0.0);
+    Vector<double> physical_b(2, 0.0);
+    for (unsigned i = 0; i < 2; ++i)
+    {
+      physical_a[i] = jacobian(i, 0) * a[0] + jacobian(i, 1) * a[1];
+      physical_b[i] = jacobian(i, 0) * b[0] + jacobian(i, 1) * b[1];
+    }
+
+    vertex_physical_second_derivative_coefficients(
+      vertex, physical_a, physical_b, coefficients);
+
+    // Chain-rule contribution from the Hessian of the coordinate map:
+    //
+    // a^T H_s(w) b = (J a)^T H_x(w) (J b)
+    //                  + grad_x(w) . H_F[a,b]. <- This term
+    for (unsigned i = 0; i < 2; ++i)
+    {
+      double map_second_derivative = 0.0;
+      for (unsigned alpha = 0; alpha < 2; ++alpha)
+      {
+        for (unsigned beta = 0; beta < 2; ++beta)
+        {
+          map_second_derivative +=
+            a[alpha] * b[beta] * map_hessian(i, alpha, beta);
+        }
+      }
+      coefficients[3 + 2 * vertex + i] += map_second_derivative;
+    }
+  }
+
+
+
   /// Assemble T directly from the global and basic dof definitions, then
   /// transpose it to obtain C.
   template<unsigned BOUNDARY_ORDER>
@@ -81,7 +227,8 @@ namespace oomph
     // ------------------------------------------------------------------
     for (unsigned vertex = 0; vertex < 3; ++vertex)
     {
-      // [zdec] Method that fills out identity block for vertices
+      vertex_value_coefficients(vertex, coefficients);
+      put_row(Basic_dofs_from_global_dofs, vertex, coefficients);
     }
 
     // ------------------------------------------------------------------
@@ -93,16 +240,23 @@ namespace oomph
 
     for (unsigned vertex = 0; vertex < 3; ++vertex)
     {
-      // [zdec] Method that fills out the first derivative blocks
-      // for rows 
-      //   3 + 2 * vertex
-      //   4 + 2 * vertex
+      vertex_reference_first_derivative_coefficients(vertex, e0, coefficients);
+      put_row(Basic_dofs_from_global_dofs, 3 + 2 * vertex, coefficients);
 
-      // [zdec] Method that fills out the second derivative blocks
-      // for rows 
-      //   9 + 3 * vertex
-      //  10 + 3 * vertex
-      //  11 + 3 * vertex
+      vertex_reference_first_derivative_coefficients(vertex, e1, coefficients);
+      put_row(Basic_dofs_from_global_dofs, 4 + 2 * vertex, coefficients);
+
+      vertex_reference_second_derivative_coefficients(
+        vertex, e0, e0, coefficients);
+      put_row(Basic_dofs_from_global_dofs, 9 + 3 * vertex, coefficients);
+
+      vertex_reference_second_derivative_coefficients(
+        vertex, e0, e1, coefficients);
+      put_row(Basic_dofs_from_global_dofs, 10 + 3 * vertex, coefficients);
+
+      vertex_reference_second_derivative_coefficients(
+        vertex, e1, e1, coefficients);
+      put_row(Basic_dofs_from_global_dofs, 11 + 3 * vertex, coefficients);
     }
 
     // ------------------------------------------------------------------
@@ -147,17 +301,18 @@ namespace oomph
     // ------------------------------------------------------------------
     for (unsigned i = 0; i < ninternal; ++i)
     {
-      // [zdec] Method that fills out identity block for internal dofs
+      zero_global_dof_coefficients(coefficients);
+      coefficients[18 + i] = 1.0;
+      put_row(
+        Basic_dofs_from_global_dofs, 21 + 2 * nmidnodes + i, coefficients);
     }
 
-#ifdef PARANOID
     if (21 + 2 * nmidnodes + ninternal != nbasic)
     {
       throw OomphLibError("Internal error in algebraic direct dof count.",
                           OOMPH_CURRENT_FUNCTION,
                           OOMPH_EXCEPTION_LOCATION);
     }
-#endif
 
     // C=T^T.
     Direct_basic_association_matrix.resize(nbasis, nbasic, 0.0);
