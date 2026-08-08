@@ -1,6 +1,6 @@
-/// ====================================================================
-/// Algebraic direct construction of the Bernadou curved Bell basis.
-/// ====================================================================
+// ====================================================================
+// Algebraic direct construction of the Bernadou curved Bell basis.
+// ====================================================================
 
 #ifndef OOMPH_DIRECT_BERNADOU_ELEMENT_BASIS_H
 #define OOMPH_DIRECT_BERNADOU_ELEMENT_BASIS_H
@@ -84,6 +84,11 @@ namespace oomph
                         DShape& d2psi,
                         DShape& d2bpsi) const override;
 
+    /// Fill the global-basis-to-monomial association matrix.
+    /// [zdec] We only need this for comparing to original elements
+    void fill_in_full_association_matrix(
+      DenseMatrix<double>& conversion_matrix) const override;
+
     /// Fill T, where
     ///
     ///          basic_dofs = T * global_dofs.
@@ -101,6 +106,15 @@ namespace oomph
     /// Exists as a public read interface.
     void fill_in_direct_basic_association_matrix(
       DenseMatrix<double>& direct_matrix) const;
+
+    /// Development/validation helper. The returned matrices are in the
+    /// monomial basis. direct_matrix and factorised_matrix should agree up to
+    /// roundoff when the algebraic direct construction reproduces the original
+    /// D*B construction.
+    void compare_with_factorised_association_matrix(
+      DenseMatrix<double>& direct_matrix,
+      DenseMatrix<double>& factorised_matrix,
+      DenseMatrix<double>& difference_matrix) const;
 
   private:
     /// No copying.
@@ -123,9 +137,32 @@ namespace oomph
     /// transpose it to obtain C.
     void build_algebraic_transformation() const;
 
+    /// Return reference location, reference tangent, outward unit reference
+    /// normal, and endpoint vertices for one of the three basic edges.
+    ///
+    /// The edge parameters are:
+    ///   edge 0: s=(0,u),     node 2 -> node 1;
+    ///   edge 1: s=(u,0),     node 2 -> node 0;
+    ///   edge 2: s=(u,1-u),   node 1 -> node 0.
+    static void get_reference_edge_geometry(const unsigned& edge,
+					    const double& u,
+                                            Vector<double>& s,
+                                            Vector<double>& tangent,
+                                            Vector<double>& outward_normal,
+                                            unsigned& start_vertex,
+                                            unsigned& end_vertex);
+
+    /// Basic-edge interpolation abscissa in the ordering used by the full
+    /// basic basis.
+    static double edge_dof_abscissa(const unsigned& edge,
+                                    const unsigned& point_index);
+
     /// Quintic Hermite basis ordered as
     /// [f(0),f(1),f'(0),f'(1),f''(0),f''(1)].
     static void quintic_hermite(const double& u, Vector<double>& h);
+
+    /// Derivative with respect to u of the quintic Hermite basis.
+    static void d_quintic_hermite(const double& u, Vector<double>& dh);
 
     /// Cubic Hermite basis ordered as
     /// [g(0),g(1),g'(0),g'(1)].
@@ -177,6 +214,58 @@ namespace oomph
       const Vector<double>& b,
       Vector<double>& coefficients) const;
 
+    /// Algebraic coefficients of the quintic value trace at an edge point.
+    void edge_value_coefficients(const unsigned& edge,
+                                 const double& u,
+                                 Vector<double>& coefficients) const;
+
+    /// Algebraic coefficients of the derivative with respect to the chosen
+    /// edge parameter of the quintic value trace.
+    void edge_value_parameter_derivative_coefficients(
+      const unsigned& edge,
+      const double& u,
+      Vector<double>& coefficients) const;
+
+    /// Algebraic coefficients of the basic outward-normal derivative at an
+    /// edge point.
+    void edge_basic_normal_derivative_coefficients(
+      const unsigned& edge,
+      const double& u,
+      Vector<double>& coefficients) const;
+
+    /// Transform reference derivatives of an arbitrary list of functions to
+    /// Eulerian derivatives.
+    double transform_basis_derivatives_reference_to_eulerian(
+      const Vector<double>& s,
+      const unsigned& nfunction,
+      const DShape& d_reference,
+      const DShape& d2_reference,
+      DShape& d_eulerian,
+      DShape& d2_eulerian,
+      const bool& compute_second_derivatives) const;
+
+    // [zdec] better name for this
+    /// Evaluate the final global basis and its reference derivatives from C.
+    void evaluate_global_basis_wrt_reference(
+      const Vector<double>& s,
+      Shape& value,
+      DShape& dvalue,
+      DShape& d2value,
+      const bool& compute_second_derivatives) const;
+
+    /// Scatter a flat list of global basis values into oomph-lib's nodal and
+    /// bubble Shape containers, applying the curved-edge node permutation.
+    void scatter_values(const Shape& value, Shape& psi, Shape& bpsi) const;
+
+    /// Scatter first derivatives.
+    void scatter_first_derivatives(const DShape& dvalue,
+                                   DShape& dpsi,
+                                   DShape& dbpsi) const;
+
+    /// Scatter second derivatives.
+    void scatter_second_derivatives(const DShape& d2value,
+                                    DShape& d2psi,
+                                    DShape& d2bpsi) const;
   };
 
 } // namespace oomph
