@@ -361,7 +361,9 @@ namespace oomph
   }
 
 
-  /// Algebraic coefficients of the quintic value trace at an edge point.
+  /// Algebraic coefficients of the quintic value trace at an edge point. This
+  /// explicitly imposes the constraint that edge values are interpolated
+  /// quintically.
   template<unsigned BOUNDARY_ORDER>
   void DirectBernadouElementBasis<BOUNDARY_ORDER>::edge_value_coefficients(
     const unsigned& edge, const double& u, Vector<double>& coefficients) const
@@ -431,27 +433,29 @@ namespace oomph
   }
 
 
-  /// Algebraic coefficients of the basic outward-normal derivative at an
-  /// edge point.
+  /// Algebraic coefficients of the basic outward-normal derivative at an edge
+  /// point. This explicitly imposes that the physical normal on straight edges
+  /// and the reference normal on the curved edge are cubically interpolated by
+  /// the nodal data.
   template<unsigned BOUNDARY_ORDER>
   void DirectBernadouElementBasis<BOUNDARY_ORDER>::
     edge_basic_normal_derivative_coefficients(
       const unsigned& edge, const double& u, Vector<double>& coefficients) const
   {
     Vector<double> s(2);
-    Vector<double> reference_tangent_at_u(2);
-    Vector<double> reference_outward_normal_at_u(2);
+    Vector<double> reference_tangent(2);
+    Vector<double> reference_normal(2);
 
     unsigned start_vertex = 0;
     unsigned end_vertex = 0;
 
     get_reference_edge_geometry(edge,
-                                u,
-                                s,
-                                reference_tangent_at_u,
-                                reference_outward_normal_at_u,
-                                start_vertex,
-                                end_vertex);
+				u,
+				s,
+				reference_tangent,
+				reference_normal,
+				start_vertex,
+				end_vertex);
 
     Vector<double> h3(4);
     cubic_hermite(u, h3);
@@ -461,23 +465,19 @@ namespace oomph
     // cubically.
     if (edge == 2)
     {
-      Vector<double> q(2);
       Vector<double> g_functional[4];
 
-      n[0] = 1.0 / std::sqrt(2.0);
-      n[1] = 1.0 / std::sqrt(2.0);
+      vertex_reference_first_derivative_coefficients(
+        start_vertex, reference_normal, g_functional[0]);
 
       vertex_reference_first_derivative_coefficients(
-        start_vertex, n, g_functional[0]);
-
-      vertex_reference_first_derivative_coefficients(
-        end_vertex, n, g_functional[1]);
+        end_vertex, reference_normal, g_functional[1]);
 
       vertex_reference_second_derivative_coefficients(
-        start_vertex, n, reference_tangent_at_u, g_functional[2]);
+        start_vertex, reference_normal, reference_tangent, g_functional[2]);
 
       vertex_reference_second_derivative_coefficients(
-        end_vertex, n, reference_tangent_at_u, g_functional[3]);
+        end_vertex, reference_normal, reference_tangent, g_functional[3]);
 
       zero_global_dof_coefficients(coefficients);
 
@@ -532,8 +532,8 @@ namespace oomph
     Vector<double> physical_tangent(2, 0.0);
     for (unsigned i = 0; i < 2; ++i)
     {
-      physical_tangent[i] =
-        jacobian(i, 0) * tangent[0] + jacobian(i, 1) * tangent[1];
+      physical_tangent[i] = jacobian(i, 0) * reference_tangent[0] +
+			    jacobian(i, 1) * reference_tangent[1];
     }
 
     // Use its 90-degree rotation as the fixed physical edge normal.
@@ -541,16 +541,29 @@ namespace oomph
     physical_normal[0] = -physical_tangent[1];
     physical_normal[1] = physical_tangent[0];
 
-    const double normal_norm_squared = physical_normal[0] * physical_normal[0] +
-				       physical_normal[1] * physical_normal[1];
-
 #ifdef PARANOID
-    if (normal_norm_squared <= 100.0 * std::numeric_limits<double>::epsilon())
+    // Check that the edge isn't collapsed compared to the element size
+    double jacobian_scale_squared = 0.0;
+    for (unsigned i = 0; i < 2; ++i)
     {
-      throw OomphLibError(
-        "Collapsed straight edge in curved C1 basis construction.",
-        OOMPH_CURRENT_FUNCTION,
-        OOMPH_EXCEPTION_LOCATION);
+      for (unsigned j = 0; j < 2; ++j)
+      {
+        jacobian_scale_squared += jacobian(i, j) * jacobian(i, j);
+      }
+    }
+
+    const double tangent_norm_squared =
+      physical_tangent[0] * physical_tangent[0] +
+      physical_tangent[1] * physical_tangent[1];
+
+    const double tolerance = 100.0 * std::numeric_limits<double>::epsilon();
+
+    if (tangent_norm_squared <= tolerance * jacobian_scale_squared)
+    {
+      throw OomphLibError("Collapsed or nearly collapsed straight edge in "
+                          "curved C1 basis construction.",
+                          OOMPH_CURRENT_FUNCTION,
+                          OOMPH_EXCEPTION_LOCATION);
     }
 #endif
 
@@ -577,7 +590,6 @@ namespace oomph
     // Evaluate the cubic physical-normal derivative trace at u.
     Vector<double> physical_normal_trace;
     zero_global_dof_coefficients(physical_normal_trace);
-
     for (unsigned i = 0; i < 4; ++i)
     {
       add_scaled(physical_normal_trace, g_functional[i], h3[i]);
@@ -589,11 +601,10 @@ namespace oomph
     // Unlike the physical edge tangent, J*n_hat need not be constant along the
     // straight edge, so this must use the Jacobian at the actual point u.
     Vector<double> mapped_basic_normal(2, 0.0);
-
     for (unsigned i = 0; i < 2; ++i)
     {
-      mapped_basic_normal[i] =
-        jacobian(i, 0) * outward_normal[0] + jacobian(i, 1) * outward_normal[1];
+      mapped_basic_normal[i] = jacobian(i, 0) * reference_normal[0] +
+			       jacobian(i, 1) * reference_normal[1];
     }
 
     // The tangential derivative of the quintic edge-value trace.
@@ -604,36 +615,8 @@ namespace oomph
     // Decompose the mapped basic normal into the physical tangent/normal basis:
     //
     //     J*n_hat = alpha*t + beta*N.
-    //
     const double determinant = physical_tangent[0] * physical_normal[1] -
                                physical_tangent[1] * physical_normal[0];
-
-
-#ifdef PARANOID
-    // Get a scale for the Jacobian to compare against the determinant
-    double scale = 1.0;
-    for (unsigned i = 0; i < 2; ++i)
-    {
-      for (unsigned j = 0; j < 2; ++j)
-      {
-        const double value = absolute_value(jacobian(i, j));
-
-        if (value > scale)
-        {
-          scale = value;
-        }
-      }
-    }
-
-    if (std::fabs(determinant) <=
-        100.0 * std::numeric_limits<double>::epsilon() * scale)
-    {
-      throw OomphLibError("Degenerate tangent/normal decomposition in "
-                          "curved C1 basis construction.",
-                          OOMPH_CURRENT_FUNCTION,
-                          OOMPH_EXCEPTION_LOCATION);
-    }
-#endif
 
     const double alpha = (mapped_basic_normal[0] * physical_normal[1] -
                           mapped_basic_normal[1] * physical_normal[0]) /
@@ -898,28 +881,26 @@ namespace oomph
       jacobian(0, 0) * jacobian(1, 1) - jacobian(0, 1) * jacobian(1, 0);
 
 #ifdef PARANOID
-    double scale = 1.0;
+    // Check that the jacobian isn't degenerate compared to the Frobenius norm
+    double jacobian_norm_squared = 0.0;
+
     for (unsigned i = 0; i < 2; ++i)
     {
       for (unsigned j = 0; j < 2; ++j)
       {
-        const double value = absolute_value(jacobian(i, j));
-
-        if (value > scale)
-        {
-          scale = value;
-        }
+        jacobian_norm_squared += jacobian(i, j) * jacobian(i, j);
       }
     }
 
-    if (std::fabs(det) <=
-        100.0 * std::numeric_limits<double>::epsilon() * scale * scale)
+    if ((jacobian_norm_squared == 0.0) ||
+        (std::fabs(det) <= 100.0 * std::numeric_limits<double>::epsilon() *
+                             jacobian_norm_squared))
     {
       throw OomphLibError(
-	"Singular or nearly singular curved-element Jacobian. det(J) = " +
-	  std::to_string(det) + ".",
-	OOMPH_CURRENT_FUNCTION,
-	OOMPH_EXCEPTION_LOCATION);
+        "Singular or nearly singular curved-element Jacobian. det(J) = " +
+          std::to_string(det) + ".",
+        OOMPH_CURRENT_FUNCTION,
+        OOMPH_EXCEPTION_LOCATION);
     }
 #endif
 
