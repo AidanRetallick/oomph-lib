@@ -41,11 +41,6 @@
 // For p=5, there are 55 reference polynomials of degree n=9 that are used to
 // calculate the 28 C1 curved Bell element basis polynomials.
 
-// [zdec] TODO: Importantly, as this is all geometry independent, it can all be
-// precomputed, this is currently only done for p=5 curved Bell elements so far
-// though. Once this is done for p=3, // hierher this comment ends mid sentence
-
-
 // We could definitely store this as a static  // hierher Aidan: Let's!
 // UPDATE after initial pull request: Can't
 // now remember what we decided, but can you sort this out (or raise it again)

@@ -1041,30 +1041,21 @@ namespace oomph
     //----------------------------------------------------------------------
     // Jacobian and residual contributions
 
-    /// Add the element's contribution to its residual vector (wrapper) with
-    /// cached association matrix
+    /// Add the element's contribution using the basis coefficients stored at upgrade.
     void fill_in_contribution_to_residuals(Vector<double>& residuals)
     {
-      // Store the expensive-to-construct matrix
-      this->store_association_matrix();
       // Call the generic routine with the flag set to 1
       KoiterSteigmannEquations::fill_in_contribution_to_residuals(residuals);
-      // Remove the expensive-to-construct matrix
-      this->delete_association_matrix();
     }
 
     /// Add the element's contribution to its residual vector and
-    /// element Jacobian matrix (wrapper) with caching of association matrix
+    /// element Jacobian matrix using the basis coefficients stored at upgrade.
     void fill_in_contribution_to_jacobian(Vector<double>& residuals,
                                           DenseMatrix<double>& jacobian)
     {
-      // Store the expensive-to-construct matrix
-      this->store_association_matrix();
       // Call the generic routine with the flag set to 1
       KoiterSteigmannEquations::fill_in_contribution_to_jacobian(residuals,
                                                                  jacobian);
-      // Remove the expensive-to-construct matrix
-      this->delete_association_matrix();
     }
 
 

@@ -4,41 +4,630 @@
 
 #include "c1_curved_elements_direct.h"
 #include <cmath>
+#include <limits>
+#include <string>
 
 namespace oomph
 {
-  /// Constructor. The algebraic transformation is built after
-  /// upgrade_element().
+  /// Construct an unupgraded basis with zeroed geometry coefficients.
   template<unsigned BOUNDARY_ORDER>
   DirectBernadouElementBasis<BOUNDARY_ORDER>::DirectBernadouElementBasis()
-    : Base(), Algebraic_transformation_is_built(false)
+    : Vertices(3, Vector<double>(2, 0.0)),
+      S_ubar(0.0),
+      S_obar(0.0),
+      Curved_edge(C1PlateHelper::CurvedEdgeEnumeration::none)
   {
+    for (unsigned i = 0; i < 2; ++i)
+    {
+      A1_vector[i] = 0.0;
+      B2_vector[i] = 0.0;
+      for (unsigned j = 0; j < 4; ++j)
+      {
+        Correction_s[i][j] = 0.0;
+        Correction_t[i][j] = 0.0;
+      }
+    }
   }
 
 
-  /// Upgrade the geometry and construct T and C=T^T algebraically.
+  /// Upgrade the element geometry and eagerly build M=T^T A.
   template<unsigned BOUNDARY_ORDER>
   void DirectBernadouElementBasis<BOUNDARY_ORDER>::upgrade_element(
-    const VertexList& verts,
-    const double& su,
-    const double& so,
+    const VertexList& vertices,
+    const double& s_ubar,
+    const double& s_obar,
     const C1PlateHelper::CurvedEdgeEnumeration& curved_edge,
     const C1CurviLine& parametric_curve)
   {
-    Base::upgrade_element(verts, su, so, curved_edge, parametric_curve);
-    Algebraic_transformation_is_built = false;
-    build_algebraic_transformation();
+    set_up_geometry(vertices, s_ubar, s_obar, curved_edge, parametric_curve);
+    build_monomial_association_matrix();
   }
 
 
-  /// Build T and C if required.
+  /// Store the geometry in the compact form needed by the polynomial map.
   template<unsigned BOUNDARY_ORDER>
-  void DirectBernadouElementBasis<
-    BOUNDARY_ORDER>::ensure_algebraic_transformation() const
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::set_up_geometry(
+    const VertexList& vertices,
+    const double& s_ubar,
+    const double& s_obar,
+    const C1PlateHelper::CurvedEdgeEnumeration& curved_edge,
+    const C1CurviLine& parametric_curve)
   {
-    if (!Algebraic_transformation_is_built)
+#ifdef PARANOID
+    if (vertices.size() != 3)
     {
-      build_algebraic_transformation();
+      throw OomphLibError("A curved Bernadou triangle requires three vertices.",
+                          OOMPH_CURRENT_FUNCTION,
+                          OOMPH_EXCEPTION_LOCATION);
+    }
+    for (unsigned i = 0; i < 3; ++i)
+    {
+      if (vertices[i].size() != 2)
+      {
+        throw OomphLibError("Curved Bernadou vertices must be two-dimensional.",
+                            OOMPH_CURRENT_FUNCTION,
+                            OOMPH_EXCEPTION_LOCATION);
+      }
+    }
+    if (curved_edge == C1PlateHelper::CurvedEdgeEnumeration::none)
+    {
+      throw OomphLibError("A curved Bernadou basis requires a curved edge.",
+                          OOMPH_CURRENT_FUNCTION,
+                          OOMPH_EXCEPTION_LOCATION);
+    }
+#endif
+
+    Vertices = vertices;
+    S_ubar = s_ubar;
+    S_obar = s_obar;
+    Curved_edge = curved_edge;
+
+    const double delta_s = S_obar - S_ubar;
+    const double delta_s_squared = delta_s * delta_s;
+
+    Vector<double> d_curve_start(2, 0.0);
+    Vector<double> d_curve_end(2, 0.0);
+    Vector<double> d2_curve_start(2, 0.0);
+    Vector<double> d2_curve_end(2, 0.0);
+
+    parametric_curve.dposition(
+      Vector<double>(1, S_ubar), d_curve_start);
+    parametric_curve.dposition(
+      Vector<double>(1, S_obar), d_curve_end);
+
+    if (BOUNDARY_ORDER == 5)
+    {
+      parametric_curve.d2position(
+        Vector<double>(1, S_ubar), d2_curve_start);
+      parametric_curve.d2position(
+        Vector<double>(1, S_obar), d2_curve_end);
+    }
+
+    Vector<double> a2(2, 0.0);
+    Vector<double> b1(2, 0.0);
+    Vector<double> d1(2, 0.0);
+    Vector<double> d2(2, 0.0);
+
+    for (unsigned i = 0; i < 2; ++i)
+    {
+      A1_vector[i] = Vertices[2][i] - Vertices[0][i];
+      B2_vector[i] = Vertices[2][i] - Vertices[1][i];
+
+      a2[i] = delta_s * d_curve_start[i];
+      b1[i] = -delta_s * d_curve_end[i];
+      d1[i] = delta_s_squared * d2_curve_start[i];
+      d2[i] = delta_s_squared * d2_curve_end[i];
+
+      if (BOUNDARY_ORDER == 3)
+      {
+        const double k =
+          2.0 * (A1_vector[i] - B2_vector[i]) - (a2[i] - b1[i]);
+
+        // Q_t(t) = A2 + k*t,  Q_s(s) = B1 - k*s.
+        Correction_t[i][0] = a2[i];
+        Correction_t[i][1] = k;
+        Correction_s[i][0] = b1[i];
+        Correction_s[i][1] = -k;
+      }
+      else
+      {
+        // Q_t coefficients beta_0,...,beta_3.
+        Correction_t[i][0] = B2_vector[i] - A1_vector[i] + a2[i];
+        Correction_t[i][1] =
+          B2_vector[i] - A1_vector[i] + a2[i] + 0.5 * d1[i];
+        Correction_t[i][2] =
+          9.0 * (A1_vector[i] - B2_vector[i]) - 5.0 * a2[i] +
+          4.0 * b1[i] - d1[i] + 0.5 * d2[i];
+        Correction_t[i][3] =
+          -6.0 * (A1_vector[i] - B2_vector[i]) + 3.0 * a2[i] -
+          3.0 * b1[i] + 0.5 * (d1[i] - d2[i]);
+
+        // Q_s coefficients beta_tilde_0,...,beta_tilde_3.
+        Correction_s[i][0] = -B2_vector[i] + A1_vector[i] + b1[i];
+        Correction_s[i][1] =
+          -B2_vector[i] + A1_vector[i] + b1[i] + 0.5 * d2[i];
+        Correction_s[i][2] =
+          -9.0 * (A1_vector[i] - B2_vector[i]) - 5.0 * b1[i] +
+          4.0 * a2[i] - d2[i] + 0.5 * d1[i];
+        Correction_s[i][3] =
+          6.0 * (A1_vector[i] - B2_vector[i]) + 3.0 * b1[i] -
+          3.0 * a2[i] + 0.5 * (d2[i] - d1[i]);
+      }
+    }
+
+#ifdef PARANOID
+    Vector<double> curve_start(2, 0.0);
+    Vector<double> curve_end(2, 0.0);
+    parametric_curve.position(Vector<double>(1, S_ubar), curve_start);
+    parametric_curve.position(Vector<double>(1, S_obar), curve_end);
+    self_check_geometry(curve_start, curve_end, a2, b1);
+#endif
+  }
+
+
+#ifdef PARANOID
+  /// Geometry checks required by the direct construction. In particular, this
+  /// deliberately omits the denominator checks specific to the old D*B
+  /// factorisation.
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::self_check_geometry(
+    const Vector<double>& curve_start,
+    const Vector<double>& curve_end,
+    const Vector<double>& a2,
+    const Vector<double>& b1) const
+  {
+    const double endpoint_tolerance = 1.0e-8;
+
+    for (unsigned i = 0; i < 2; ++i)
+    {
+      if ((std::fabs(curve_start[i] - Vertices[0][i]) > endpoint_tolerance) ||
+          (std::fabs(curve_end[i] - Vertices[1][i]) > endpoint_tolerance))
+      {
+        throw OomphLibError(
+          "The supplied parametric curve does not agree with the curved-edge "
+          "vertices at s_ubar and s_obar.",
+          OOMPH_CURRENT_FUNCTION,
+          OOMPH_EXCEPTION_LOCATION);
+      }
+    }
+
+    const double a1_norm_squared =
+      A1_vector[0] * A1_vector[0] + A1_vector[1] * A1_vector[1];
+    const double a2_norm_squared = a2[0] * a2[0] + a2[1] * a2[1];
+    const double b1_norm_squared = b1[0] * b1[0] + b1[1] * b1[1];
+    const double b2_norm_squared =
+      B2_vector[0] * B2_vector[0] + B2_vector[1] * B2_vector[1];
+
+    const double a_cross = A1_vector[0] * a2[1] - A1_vector[1] * a2[0];
+    const double b_cross = b1[0] * B2_vector[1] - b1[1] * B2_vector[0];
+
+    const double tolerance = 100.0 * std::numeric_limits<double>::epsilon();
+
+    if ((a1_norm_squared == 0.0) || (a2_norm_squared == 0.0) ||
+        (std::fabs(a_cross) <=
+         tolerance * std::sqrt(a1_norm_squared * a2_norm_squared)))
+    {
+      throw OomphLibError(
+        "Degenerate curved-element geometry at vertex 0: the two local "
+        "tangent directions are linearly dependent.",
+        OOMPH_CURRENT_FUNCTION,
+        OOMPH_EXCEPTION_LOCATION);
+    }
+
+    if ((b1_norm_squared == 0.0) || (b2_norm_squared == 0.0) ||
+        (std::fabs(b_cross) <=
+         tolerance * std::sqrt(b1_norm_squared * b2_norm_squared)))
+    {
+      throw OomphLibError(
+        "Degenerate curved-element geometry at vertex 1: the two local "
+        "tangent directions are linearly dependent.",
+        OOMPH_CURRENT_FUNCTION,
+        OOMPH_EXCEPTION_LOCATION);
+    }
+  }
+#endif
+
+
+  /// Return the curve parameter at canonical vertex 0 after upgrade.
+  template<unsigned BOUNDARY_ORDER>
+  const double& DirectBernadouElementBasis<BOUNDARY_ORDER>::get_s_ubar() const
+  {
+    if (Curved_edge == C1PlateHelper::CurvedEdgeEnumeration::none)
+    {
+      throw OomphLibError("The element has not been upgraded yet.",
+                          OOMPH_CURRENT_FUNCTION,
+                          OOMPH_EXCEPTION_LOCATION);
+    }
+    return S_ubar;
+  }
+
+
+  /// Return the curve parameter at canonical vertex 1 after upgrade.
+  template<unsigned BOUNDARY_ORDER>
+  const double& DirectBernadouElementBasis<BOUNDARY_ORDER>::get_s_obar() const
+  {
+    if (Curved_edge == C1PlateHelper::CurvedEdgeEnumeration::none)
+    {
+      throw OomphLibError("The element has not been upgraded yet.",
+                          OOMPH_CURRENT_FUNCTION,
+                          OOMPH_EXCEPTION_LOCATION);
+    }
+    return S_obar;
+  }
+
+
+  /// Evaluate a cubic correction polynomial in Horner form.
+  template<unsigned BOUNDARY_ORDER>
+  double DirectBernadouElementBasis<BOUNDARY_ORDER>::cubic_polynomial_value(
+    const double coefficient[4],
+    const double& u)
+  {
+    return ((coefficient[3] * u + coefficient[2]) * u + coefficient[1]) * u +
+           coefficient[0];
+  }
+
+
+  /// Evaluate the first derivative of a cubic correction polynomial.
+  template<unsigned BOUNDARY_ORDER>
+  double DirectBernadouElementBasis<BOUNDARY_ORDER>::
+    cubic_polynomial_first_derivative(
+      const double coefficient[4],
+      const double& u)
+  {
+    return (3.0 * coefficient[3] * u + 2.0 * coefficient[2]) * u +
+           coefficient[1];
+  }
+
+
+  /// Evaluate the second derivative of a cubic correction polynomial.
+  template<unsigned BOUNDARY_ORDER>
+  double DirectBernadouElementBasis<BOUNDARY_ORDER>::
+    cubic_polynomial_second_derivative(
+      const double coefficient[4],
+      const double& u)
+  {
+    return 6.0 * coefficient[3] * u + 2.0 * coefficient[2];
+  }
+
+
+  /// Canonical basic-to-physical position x=F(s).
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::position_x(
+    const Vector<double>& s,
+    Vector<double>& x) const
+  {
+    x.resize(2);
+
+    for (unsigned i = 0; i < 2; ++i)
+    {
+      const double q_s = cubic_polynomial_value(Correction_s[i], s[0]);
+      const double q_t = cubic_polynomial_value(Correction_t[i], s[1]);
+
+      x[i] = Vertices[2][i] - A1_vector[i] * s[0] - B2_vector[i] * s[1] +
+             0.5 * s[0] * s[1] * (q_s + q_t);
+    }
+  }
+
+
+  /// Canonical Jacobian J(i,alpha)=d x_i/d s_alpha.
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::jacobian_dx_ds(
+    const Vector<double>& s,
+    DenseMatrix<double>& jacobian) const
+  {
+    for (unsigned i = 0; i < 2; ++i)
+    {
+      const double q_s = cubic_polynomial_value(Correction_s[i], s[0]);
+      const double q_t = cubic_polynomial_value(Correction_t[i], s[1]);
+      const double dq_s =
+        cubic_polynomial_first_derivative(Correction_s[i], s[0]);
+      const double dq_t =
+        cubic_polynomial_first_derivative(Correction_t[i], s[1]);
+
+      const double q = q_s + q_t;
+      jacobian(i, 0) =
+        -A1_vector[i] + 0.5 * s[1] * (q + s[0] * dq_s);
+      jacobian(i, 1) =
+        -B2_vector[i] + 0.5 * s[0] * (q + s[1] * dq_t);
+    }
+  }
+
+
+  /// Canonical mapping Hessian H(i,alpha,beta)=d2 x_i/ds_alpha ds_beta.
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::hessian_d2x_ds2(
+    const Vector<double>& s,
+    RankThreeTensor<double>& hessian) const
+  {
+    for (unsigned i = 0; i < 2; ++i)
+    {
+      const double q_s = cubic_polynomial_value(Correction_s[i], s[0]);
+      const double q_t = cubic_polynomial_value(Correction_t[i], s[1]);
+      const double dq_s =
+        cubic_polynomial_first_derivative(Correction_s[i], s[0]);
+      const double dq_t =
+        cubic_polynomial_first_derivative(Correction_t[i], s[1]);
+      const double d2q_s =
+        cubic_polynomial_second_derivative(Correction_s[i], s[0]);
+      const double d2q_t =
+        cubic_polynomial_second_derivative(Correction_t[i], s[1]);
+
+      const double q = q_s + q_t;
+
+      hessian(i, 0, 0) =
+        0.5 * s[1] * (2.0 * dq_s + s[0] * d2q_s);
+      hessian(i, 0, 1) =
+        0.5 * (q + s[0] * dq_s + s[1] * dq_t);
+      hessian(i, 1, 0) = hessian(i, 0, 1);
+      hessian(i, 1, 1) =
+        0.5 * s[0] * (2.0 * dq_t + s[1] * d2q_t);
+    }
+  }
+
+
+  /// Convert element-local coordinates to the canonical basic orientation.
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::permute_to_basic_coordinates(
+    Vector<double>& s) const
+  {
+    if (Curved_edge == C1PlateHelper::CurvedEdgeEnumeration::none)
+    {
+      throw OomphLibError("The curved edge has not been set.",
+                          OOMPH_CURRENT_FUNCTION,
+                          OOMPH_EXCEPTION_LOCATION);
+    }
+
+    if (Curved_edge == C1PlateHelper::CurvedEdgeEnumeration::zero)
+    {
+      const double s0 = s[0];
+      const double s1 = s[1];
+      s[0] = s1;
+      s[1] = 1.0 - s0 - s1;
+    }
+    else if (Curved_edge == C1PlateHelper::CurvedEdgeEnumeration::one)
+    {
+      const double s0 = s[0];
+      const double s1 = s[1];
+      s[0] = 1.0 - s0 - s1;
+      s[1] = s0;
+    }
+  }
+
+
+  /// Jacobian d s_basic / d s_local of the cyclic edge permutation.
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::
+    jacobian_ds_basic_ds_local(DenseMatrix<double>& jacobian) const
+  {
+    if (Curved_edge == C1PlateHelper::CurvedEdgeEnumeration::zero)
+    {
+      jacobian(0, 0) = 0.0;
+      jacobian(0, 1) = 1.0;
+      jacobian(1, 0) = -1.0;
+      jacobian(1, 1) = -1.0;
+    }
+    else if (Curved_edge == C1PlateHelper::CurvedEdgeEnumeration::one)
+    {
+      jacobian(0, 0) = -1.0;
+      jacobian(0, 1) = -1.0;
+      jacobian(1, 0) = 1.0;
+      jacobian(1, 1) = 0.0;
+    }
+    else if (Curved_edge == C1PlateHelper::CurvedEdgeEnumeration::two)
+    {
+      jacobian(0, 0) = 1.0;
+      jacobian(0, 1) = 0.0;
+      jacobian(1, 0) = 0.0;
+      jacobian(1, 1) = 1.0;
+    }
+    else
+    {
+      throw OomphLibError("The curved edge has not been set.",
+                          OOMPH_CURRENT_FUNCTION,
+                          OOMPH_EXCEPTION_LOCATION);
+    }
+  }
+
+
+  /// Return the cyclic shift from canonical nodes to element-local nodes.
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::nodal_index_shift(
+    unsigned& index_shift) const
+  {
+    if (Curved_edge == C1PlateHelper::CurvedEdgeEnumeration::zero)
+    {
+      index_shift = 1;
+    }
+    else if (Curved_edge == C1PlateHelper::CurvedEdgeEnumeration::one)
+    {
+      index_shift = 2;
+    }
+    else if (Curved_edge == C1PlateHelper::CurvedEdgeEnumeration::two)
+    {
+      index_shift = 0;
+    }
+    else
+    {
+      throw OomphLibError("The curved edge has not been set.",
+                          OOMPH_CURRENT_FUNCTION,
+                          OOMPH_EXCEPTION_LOCATION);
+    }
+  }
+
+
+  /// Public compatibility wrapper: physical coordinate at element-local s.
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::coordinate_x(
+    const Vector<double>& s,
+    Vector<double>& x) const
+  {
+    Vector<double> s_basic(s);
+    permute_to_basic_coordinates(s_basic);
+    position_x(s_basic, x);
+  }
+
+
+  /// Public compatibility wrapper: d x/d s_local.
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::get_jacobian(
+    const Vector<double>& s,
+    DenseMatrix<double>& jacobian) const
+  {
+    Vector<double> s_basic(s);
+    permute_to_basic_coordinates(s_basic);
+
+    DenseMatrix<double> jacobian_dx_ds_basic(2, 2, 0.0);
+    DenseMatrix<double> jacobian_ds_basic_ds(2, 2, 0.0);
+    jacobian_dx_ds(s_basic, jacobian_dx_ds_basic);
+    jacobian_ds_basic_ds_local(jacobian_ds_basic_ds);
+
+    jacobian.resize(2, 2);
+    jacobian.initialise(0.0);
+    for (unsigned i = 0; i < 2; ++i)
+    {
+      for (unsigned alpha = 0; alpha < 2; ++alpha)
+      {
+        for (unsigned beta = 0; beta < 2; ++beta)
+        {
+          jacobian(i, beta) +=
+            jacobian_dx_ds_basic(i, alpha) * jacobian_ds_basic_ds(alpha, beta);
+        }
+      }
+    }
+  }
+
+
+  /// Return the location of an internal value degree of freedom in the
+  /// element's local coordinate system.
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::get_internal_dofs_location(
+    const unsigned& idof,
+    Vector<double>& s) const
+  {
+#ifdef RANGE_CHECKING
+    if (idof >= n_internal_dofs())
+    {
+      throw OomphLibError("Internal curved-element dof index is out of range.",
+                          OOMPH_CURRENT_FUNCTION,
+                          OOMPH_EXCEPTION_LOCATION);
+    }
+#endif
+
+    static const double p3_knots[3][2] = {
+      {1.0 / 2.0, 1.0 / 4.0},
+      {1.0 / 4.0, 1.0 / 2.0},
+      {1.0 / 4.0, 1.0 / 4.0}};
+
+    static const double p5_knots[10][2] = {
+      {1.0 / 6.0, 2.0 / 3.0},
+      {1.0 / 6.0, 1.0 / 2.0},
+      {1.0 / 6.0, 1.0 / 3.0},
+      {1.0 / 6.0, 1.0 / 6.0},
+      {1.0 / 3.0, 1.0 / 6.0},
+      {1.0 / 2.0, 1.0 / 6.0},
+      {2.0 / 3.0, 1.0 / 6.0},
+      {1.0 / 2.0, 1.0 / 3.0},
+      {1.0 / 3.0, 1.0 / 2.0},
+      {1.0 / 3.0, 1.0 / 3.0}};
+
+    s.resize(2);
+    if (BOUNDARY_ORDER == 3)
+    {
+      s[0] = p3_knots[idof][0];
+      s[1] = p3_knots[idof][1];
+    }
+    else
+    {
+      s[0] = p5_knots[idof][0];
+      s[1] = p5_knots[idof][1];
+    }
+
+    // permute_to_basic_coordinates is a cyclic map. Applying it twice gives
+    // the inverse map required to return from the canonical basic orientation
+    // to the element-local orientation.
+    permute_to_basic_coordinates(s);
+    permute_to_basic_coordinates(s);
+  }
+
+
+  /// Evaluate reference monomials in the historical Bernadou ordering.
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::monomials(
+    const Vector<double>& s,
+    Shape& monomial) const
+  {
+    const unsigned order = basic_basis_order();
+    double s0_power[10];
+    double s1_power[10];
+    s0_power[0] = 1.0;
+    s1_power[0] = 1.0;
+    for (unsigned i = 1; i <= order; ++i)
+    {
+      s0_power[i] = s0_power[i - 1] * s[0];
+      s1_power[i] = s1_power[i - 1] * s[1];
+    }
+
+    unsigned counter = 0;
+    for (int l = static_cast<int>(order); l >= 0; --l)
+    {
+      for (int m = 0; m <= l; ++m)
+      {
+        monomial[counter] = s0_power[l - m] * s1_power[m];
+        ++counter;
+      }
+    }
+  }
+
+
+  /// Evaluate reference monomials and their first/second derivatives.
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::monomials_and_derivatives(
+    const Vector<double>& s,
+    Shape& monomial,
+    DShape& dmonomial,
+    DShape& d2monomial,
+    const bool& compute_second_derivatives) const
+  {
+    const unsigned order = basic_basis_order();
+    double s0_power[10];
+    double s1_power[10];
+    s0_power[0] = 1.0;
+    s1_power[0] = 1.0;
+    for (unsigned i = 1; i <= order; ++i)
+    {
+      s0_power[i] = s0_power[i - 1] * s[0];
+      s1_power[i] = s1_power[i - 1] * s[1];
+    }
+
+    unsigned counter = 0;
+    for (int l = static_cast<int>(order); l >= 0; --l)
+    {
+      for (int m = 0; m <= l; ++m)
+      {
+        const int p = l - m;
+        const int q = m;
+
+        monomial[counter] = s0_power[p] * s1_power[q];
+
+        dmonomial(counter, 0) =
+          (p > 0 ? p * s0_power[p - 1] * s1_power[q] : 0.0);
+        dmonomial(counter, 1) =
+          (q > 0 ? q * s0_power[p] * s1_power[q - 1] : 0.0);
+
+        if (compute_second_derivatives)
+        {
+          d2monomial(counter, 0) =
+            (p > 1 ? p * (p - 1) * s0_power[p - 2] * s1_power[q] : 0.0);
+          d2monomial(counter, 1) =
+            (p > 0 && q > 0 ?
+               p * q * s0_power[p - 1] * s1_power[q - 1] :
+               0.0);
+          d2monomial(counter, 2) =
+            (q > 1 ? q * (q - 1) * s0_power[p] * s1_power[q - 2] : 0.0);
+        }
+
+        ++counter;
+      }
     }
   }
 
@@ -296,7 +885,7 @@ namespace oomph
     s[1] = vertex_coordinate[vertex][1];
 
     DenseMatrix<double> jacobian(2, 2, 0.0);
-    this->get_basic_jacobian(s, jacobian);
+    this->jacobian_dx_ds(s, jacobian);
 
     Vector<double> physical_direction(2, 0.0);
     for (unsigned i = 0; i < 2; ++i)
@@ -329,8 +918,8 @@ namespace oomph
 
     DenseMatrix<double> jacobian(2, 2, 0.0);
     RankThreeTensor<double> map_hessian(2, 2, 2, 0.0);
-    this->get_basic_jacobian(s, jacobian);
-    this->get_basic_hessian(s, map_hessian);
+    this->jacobian_dx_ds(s, jacobian);
+    this->hessian_d2x_ds2(s, map_hessian);
 
     Vector<double> physical_a(2, 0.0);
     Vector<double> physical_b(2, 0.0);
@@ -396,8 +985,8 @@ namespace oomph
   }
 
 
-  /// Algebraic coefficients of the derivative with respect to the chosen
-  /// edge parameter of the quintic value trace.
+  /// Algebraic coefficients of the derivative with respect to the edge
+  /// parameter of the quintic value trace.
   /// (Needed for the normal derivative interpolation on straight edges)
   template<unsigned BOUNDARY_ORDER>
   void DirectBernadouElementBasis<BOUNDARY_ORDER>::
@@ -526,7 +1115,7 @@ namespace oomph
 
     // Get the Jacobian at the requested edge point.
     DenseMatrix<double> jacobian(2, 2, 0.0);
-    this->get_basic_jacobian(s, jacobian);
+    this->jacobian_dx_ds(s, jacobian);
 
     // Map the basic edge tangent into physical space.
     Vector<double> physical_tangent(2, 0.0);
@@ -638,11 +1227,11 @@ namespace oomph
 }
 
 
-  /// Assemble T directly from the global and basic dof definitions, then
-  /// transpose it to obtain C.
+  /// Assemble temporary T directly from the global and basic DOF definitions.
   template<unsigned BOUNDARY_ORDER>
   void DirectBernadouElementBasis<
-    BOUNDARY_ORDER>::build_algebraic_transformation() const
+    BOUNDARY_ORDER>::build_basic_dof_transformation_matrix(
+      DenseMatrix<double>& transformation_matrix) const
   {
     const unsigned nbasis = this->n_basis_functions();
     const unsigned nbasic = this->n_basic_basis_functions();
@@ -650,7 +1239,7 @@ namespace oomph
     const unsigned npoint_per_edge = BOUNDARY_ORDER - 1;
     const unsigned nmidnodes = 3 * npoint_per_edge;
 
-    Basic_dofs_from_global_dofs.resize(nbasic, nbasis, 0.0);
+    transformation_matrix.resize(nbasic, nbasis, 0.0);
 
     Vector<double> coefficients;
 
@@ -660,7 +1249,7 @@ namespace oomph
     for (unsigned vertex = 0; vertex < 3; ++vertex)
     {
       vertex_value_coefficients(vertex, coefficients);
-      put_row(Basic_dofs_from_global_dofs, vertex, coefficients);
+      put_row(transformation_matrix, vertex, coefficients);
     }
 
     // ------------------------------------------------------------------
@@ -673,22 +1262,22 @@ namespace oomph
     for (unsigned vertex = 0; vertex < 3; ++vertex)
     {
       vertex_reference_first_derivative_coefficients(vertex, e0, coefficients);
-      put_row(Basic_dofs_from_global_dofs, 3 + 2 * vertex, coefficients);
+      put_row(transformation_matrix, 3 + 2 * vertex, coefficients);
 
       vertex_reference_first_derivative_coefficients(vertex, e1, coefficients);
-      put_row(Basic_dofs_from_global_dofs, 4 + 2 * vertex, coefficients);
+      put_row(transformation_matrix, 4 + 2 * vertex, coefficients);
 
       vertex_reference_second_derivative_coefficients(
         vertex, e0, e0, coefficients);
-      put_row(Basic_dofs_from_global_dofs, 9 + 3 * vertex, coefficients);
+      put_row(transformation_matrix, 9 + 3 * vertex, coefficients);
 
       vertex_reference_second_derivative_coefficients(
         vertex, e0, e1, coefficients);
-      put_row(Basic_dofs_from_global_dofs, 10 + 3 * vertex, coefficients);
+      put_row(transformation_matrix, 10 + 3 * vertex, coefficients);
 
       vertex_reference_second_derivative_coefficients(
         vertex, e1, e1, coefficients);
-      put_row(Basic_dofs_from_global_dofs, 11 + 3 * vertex, coefficients);
+      put_row(transformation_matrix, 11 + 3 * vertex, coefficients);
     }
 
     // ------------------------------------------------------------------
@@ -697,7 +1286,7 @@ namespace oomph
     for (unsigned edge = 0; edge < 3; ++edge)
     {
       edge_basic_normal_derivative_coefficients(edge, 0.5, coefficients);
-      put_row(Basic_dofs_from_global_dofs, 18 + edge, coefficients);
+      put_row(transformation_matrix, 18 + edge, coefficients);
     }
 
     // ------------------------------------------------------------------
@@ -709,7 +1298,7 @@ namespace oomph
       {
         const double u = edge_dof_abscissa(edge, point);
         edge_value_coefficients(edge, u, coefficients);
-        put_row(Basic_dofs_from_global_dofs,
+        put_row(transformation_matrix,
                 21 + edge * npoint_per_edge + point,
                 coefficients);
       }
@@ -724,7 +1313,7 @@ namespace oomph
       {
         const double u = edge_dof_abscissa(edge, point);
         edge_basic_normal_derivative_coefficients(edge, u, coefficients);
-        put_row(Basic_dofs_from_global_dofs,
+        put_row(transformation_matrix,
                 21 + nmidnodes + edge * npoint_per_edge + point,
                 coefficients);
       }
@@ -738,7 +1327,7 @@ namespace oomph
       zero_global_dof_coefficients(coefficients);
       coefficients[18 + i] = 1.0;
       put_row(
-        Basic_dofs_from_global_dofs, 21 + 2 * nmidnodes + i, coefficients);
+        transformation_matrix, 21 + 2 * nmidnodes + i, coefficients);
     }
 
     if (21 + 2 * nmidnodes + ninternal != nbasic)
@@ -748,115 +1337,54 @@ namespace oomph
                           OOMPH_EXCEPTION_LOCATION);
     }
 
-    // C=T^T.
-    Direct_basic_association_matrix.resize(nbasis, nbasic, 0.0);
-    for (unsigned i = 0; i < nbasis; ++i)
-    {
-      for (unsigned j = 0; j < nbasic; ++j)
-      {
-        Direct_basic_association_matrix(i, j) =
-          Basic_dofs_from_global_dofs(j, i);
-      }
-    }
-
-    Algebraic_transformation_is_built = true;
   }
 
 
-  /// Fill T, where
-  ///
-  ///          basic_dofs = T * global_dofs.
-  ///
-  /// T has dimensions n_basic_basis_functions by n_basis_functions.
+  /// Build and store M=T^T A.
   template<unsigned BOUNDARY_ORDER>
   void DirectBernadouElementBasis<BOUNDARY_ORDER>::
-    fill_in_basic_dof_transformation_matrix(
-      DenseMatrix<double>& transformation_matrix) const
+    build_monomial_association_matrix()
   {
-    ensure_algebraic_transformation();
-    transformation_matrix = Basic_dofs_from_global_dofs;
-  }
+    const unsigned nbasis = n_basis_functions();
+    const unsigned nbasic = n_basic_basis_functions();
 
+    DenseMatrix<double> transformation_matrix(nbasic, nbasis, 0.0);
+    build_basic_dof_transformation_matrix(transformation_matrix);
 
-  /// Fill C=T^T, where
-  ///
-  ///          global_basis = C * full_basic_basis.
-  ///
-  /// C has dimensions n_basis_functions by n_basic_basis_functions.
-  template<unsigned BOUNDARY_ORDER>
-  void DirectBernadouElementBasis<BOUNDARY_ORDER>::
-    fill_in_direct_basic_association_matrix(
-      DenseMatrix<double>& direct_matrix) const
-  {
-    ensure_algebraic_transformation();
-    direct_matrix = Direct_basic_association_matrix;
-  }
+    const DenseMatrix<double>& monomial_to_basic =
+      monomial_to_basic_matrix();
 
+    Global_basis_monomial_coefficients.resize(nbasis, nbasic);
+    Global_basis_monomial_coefficients.initialise(0.0);
 
-  /// Fill the global-basis-to-monomial association matrix.
-  /// [zdec] We only need this for comparing to original elements
-  template<unsigned BOUNDARY_ORDER>
-  void DirectBernadouElementBasis<
-    BOUNDARY_ORDER>::fill_in_full_association_matrix(DenseMatrix<double>&
-                                                       conversion_matrix) const
-  {
-    ensure_algebraic_transformation();
-
-    const unsigned nbasis = this->n_basis_functions();
-    const unsigned nbasic = this->n_basic_basis_functions();
-
-    DenseMatrix<double> monomial_to_basic(nbasic, nbasic, 0.0);
-    this->monomial_to_basic_matrix(monomial_to_basic);
-
-    conversion_matrix.resize(nbasis, nbasic, 0.0);
+    // M = T^T A. T contains many exact zeros by construction, so skip them.
     for (unsigned i = 0; i < nbasis; ++i)
     {
       for (unsigned k = 0; k < nbasic; ++k)
       {
-        const double cik = Direct_basic_association_matrix(i, k);
-	// [zdec] HMMMMM! Wrote this at first because some entries should really
-	// be zero and untouched... Does this need fp tolerance?
-        if (cik == 0.0)
+        const double coefficient = transformation_matrix(k, i);
+        if (coefficient == 0.0)
         {
           continue;
         }
+
         for (unsigned j = 0; j < nbasic; ++j)
         {
-          conversion_matrix(i, j) += cik * monomial_to_basic(k, j);
+          Global_basis_monomial_coefficients(i, j) +=
+            coefficient * monomial_to_basic(k, j);
         }
       }
     }
   }
 
 
-  /// Development/validation helper. The returned matrices are in the
-  /// monomial basis. direct_matrix and factorised_matrix should agree up to
-  /// roundoff when the algebraic direct construction reproduces the original
-  /// D*B construction.
+  /// Return the stored global-basis monomial coefficients M=T^T A.
   template<unsigned BOUNDARY_ORDER>
   void DirectBernadouElementBasis<BOUNDARY_ORDER>::
-    compare_with_factorised_association_matrix(
-      DenseMatrix<double>& direct_matrix,
-      DenseMatrix<double>& factorised_matrix,
-      DenseMatrix<double>& difference_matrix) const
+    get_full_association_matrix(
+      DenseMatrix<double>& association_matrix) const
   {
-    const unsigned nbasis = this->n_basis_functions();
-    const unsigned nbasic = this->n_basic_basis_functions();
-
-    fill_in_full_association_matrix(direct_matrix);
-
-    // The original routine expects a pre-sized, zero-initialised output.
-    factorised_matrix.resize(nbasis, nbasic, 0.0);
-    Base::fill_in_full_association_matrix(factorised_matrix);
-
-    difference_matrix.resize(nbasis, nbasic, 0.0);
-    for (unsigned i = 0; i < nbasis; ++i)
-    {
-      for (unsigned j = 0; j < nbasic; ++j)
-      {
-        difference_matrix(i, j) = direct_matrix(i, j) - factorised_matrix(i, j);
-      }
-    }
+    association_matrix = Global_basis_monomial_coefficients;
   }
 
 
@@ -875,7 +1403,7 @@ namespace oomph
   {
     DenseMatrix<double> jacobian(2, 2, 0.0);
     DenseMatrix<double> inverse_jacobian(2, 2, 0.0);
-    this->get_basic_jacobian(s, jacobian);
+    this->jacobian_dx_ds(s, jacobian);
 
     const double det =
       jacobian(0, 0) * jacobian(1, 1) - jacobian(0, 1) * jacobian(1, 0);
@@ -913,7 +1441,7 @@ namespace oomph
     RankThreeTensor<double> map_hessian(2, 2, 2, 0.0);
     if (compute_second_derivatives)
     {
-      this->get_basic_hessian(s, map_hessian);
+      this->hessian_d2x_ds2(s, map_hessian);
     }
 
     for (unsigned j = 0; j < nfunction; ++j)
@@ -958,8 +1486,31 @@ namespace oomph
   }
 
 
-  // [zdec] better name for this
-  /// Evaluate the final global basis and its reference derivatives from C.
+  /// Evaluate final global basis values from the stored monomial coefficients.
+  template<unsigned BOUNDARY_ORDER>
+  void DirectBernadouElementBasis<BOUNDARY_ORDER>::
+    evaluate_global_basis_values_wrt_reference(
+      const Vector<double>& s,
+      Shape& value) const
+  {
+    const unsigned nbasis = n_basis_functions();
+    const unsigned nbasic = n_basic_basis_functions();
+
+    Shape monomial(nbasic);
+    monomials(s, monomial);
+
+    for (unsigned i = 0; i < nbasis; ++i)
+    {
+      value[i] = 0.0;
+      for (unsigned j = 0; j < nbasic; ++j)
+      {
+        value[i] += Global_basis_monomial_coefficients(i, j) * monomial[j];
+      }
+    }
+  }
+
+
+  /// Evaluate the global basis and its reference derivatives from M.
   template<unsigned BOUNDARY_ORDER>
   void DirectBernadouElementBasis<BOUNDARY_ORDER>::
     evaluate_global_basis_wrt_reference(const Vector<double>& s,
@@ -968,21 +1519,16 @@ namespace oomph
                                    DShape& d2value,
                                    const bool& compute_second_derivatives) const
   {
-    ensure_algebraic_transformation();
-
     const unsigned nbasis = this->n_basis_functions();
     const unsigned nbasic = this->n_basic_basis_functions();
 
-    Shape basic_value(nbasic);
-    DShape basic_dvalue(nbasic, 2);
-    DShape basic_d2value(nbasic, 3);
+    Shape monomial_value(nbasic);
+    DShape monomial_dvalue(nbasic, 2);
+    DShape monomial_d2value(nbasic, 3);
 
-    this->full_basic_polynomials(s, basic_value);
-    this->dfull_basic_polynomials(s, basic_dvalue);
-    if (compute_second_derivatives)
-    {
-      this->d2full_basic_polynomials(s, basic_d2value);
-    }
+    monomials_and_derivatives(
+      s, monomial_value, monomial_dvalue, monomial_d2value,
+      compute_second_derivatives);
 
     for (unsigned i = 0; i < nbasis; ++i)
     {
@@ -997,15 +1543,15 @@ namespace oomph
       }
       for (unsigned j = 0; j < nbasic; ++j)
       {
-        const double coefficient = Direct_basic_association_matrix(i, j);
-        value[i] += coefficient * basic_value[j];
-        dvalue(i, 0) += coefficient * basic_dvalue(j, 0);
-        dvalue(i, 1) += coefficient * basic_dvalue(j, 1);
+        const double coefficient = Global_basis_monomial_coefficients(i, j);
+        value[i] += coefficient * monomial_value[j];
+        dvalue(i, 0) += coefficient * monomial_dvalue(j, 0);
+        dvalue(i, 1) += coefficient * monomial_dvalue(j, 1);
         if (compute_second_derivatives)
         {
-          d2value(i, 0) += coefficient * basic_d2value(j, 0);
-          d2value(i, 1) += coefficient * basic_d2value(j, 1);
-          d2value(i, 2) += coefficient * basic_d2value(j, 2);
+          d2value(i, 0) += coefficient * monomial_d2value(j, 0);
+          d2value(i, 1) += coefficient * monomial_d2value(j, 1);
+          d2value(i, 2) += coefficient * monomial_d2value(j, 2);
         }
       }
     }
@@ -1113,12 +1659,10 @@ namespace oomph
     const Vector<double>& s, Shape& psi, Shape& bpsi) const
   {
     Vector<double> s_basic(s);
-    this->permute_shape(s_basic);
+    this->permute_to_basic_coordinates(s_basic);
 
     Shape value(this->n_basis_functions());
-    DShape dvalue(this->n_basis_functions(), 2);
-    DShape d2value(this->n_basis_functions(), 3);
-    evaluate_global_basis_wrt_reference(s_basic, value, dvalue, d2value, false);
+    evaluate_global_basis_values_wrt_reference(s_basic, value);
     scatter_values(value, psi, bpsi);
   }
 
@@ -1133,7 +1677,7 @@ namespace oomph
     DShape& dbpsi) const
   {
     Vector<double> s_basic(s);
-    this->permute_shape(s_basic);
+    this->permute_to_basic_coordinates(s_basic);
 
     const unsigned nbasis = this->n_basis_functions();
     Shape value(nbasis);
@@ -1170,7 +1714,7 @@ namespace oomph
     DShape& d2bpsi) const
   {
     Vector<double> s_basic(s);
-    this->permute_shape(s_basic);
+    this->permute_to_basic_coordinates(s_basic);
 
     const unsigned nbasis = this->n_basis_functions();
     Shape value(nbasis);

@@ -16,6 +16,7 @@ Qelement_face_coordinate_translation_schemes.cc \
 Telements.cc hermite_elements.cc   \
 bell_element_basis.cc c1_curved_elements.cc \
 c1_curved_elements_direct.cc \
+c1_curved_association_matrix_direct.cc \
 c1_curved_basic_basis.cc c1_curved_association_matrix.cc \
 elastic_problems.cc  hijacked_elements.cc      \
 algebraic_elements.cc \
