@@ -80,7 +80,7 @@ mesh.h           timesteppers.h  explicit_timesteppers.h \
 hermite_elements.h  nodes.h      oomph_utilities.h \
 bell_element_basis.h c1_curved_elements.h \
 c1_curved_elements_direct.h \
-c1_plate_helper.h subparametric_Telement.h \
+c1_plate_helper.h curvable_bell_element.h \
 elastic_problems.h  hijacked_elements.h      geom_objects.h \
 algebraic_elements.h            macro_element.h \
 stored_shape_function_elements.h \

@@ -27,8 +27,8 @@
 // LIC// The authors may be contacted at oomph-lib@maths.man.ac.uk.
 // LIC//
 // LIC//====================================================================
-#ifndef OOMPH_SUBPARAMETRIC_TELEMENTS_HEADER
-#define OOMPH_SUBPARAMETRIC_TELEMENTS_HEADER
+#ifndef OOMPH_CURVABLE_BELL_ELEMENTS_HEADER
+#define OOMPH_CURVABLE_BELL_ELEMENTS_HEADER
 
 // [zdec] I was having such a nightmare with this level in the class heirarchy
 // that I put the whole thing into Astra 6.0 and argued with it until we both
@@ -45,11 +45,11 @@
 // conditions which are often relative to the normal and are analogous to
 // displacement and forcing.
 //
-// I also wanted to move the management of different fields to the full finite
-// elements and keep this a container for the geometry and basis information
-// only. I may change my mind on this second point though and go for something
-// in-between, where this class has helpers to assign memory based on the number
-// of fields but we will see...
+// I also moved the management of different fields to the full finite elements
+// and keep this a container for the geometry and basis information only. I may
+// change my mind on this second point though and go for something in-between,
+// where this class has helpers to assign memory based on the number of fields
+// but we will see...
 //
 //   -- Aidan.
 

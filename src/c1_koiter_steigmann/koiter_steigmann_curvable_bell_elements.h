@@ -4,7 +4,7 @@
 
 // oomph-lib headers
 #include "koiter_steigmann_equations.h"
-#include "src/generic/subparametric_Telement.h"
+#include "src/generic/curvable_bell_element.h"
 #include "src/generic/oomph_definitions.h"
 
 namespace oomph
