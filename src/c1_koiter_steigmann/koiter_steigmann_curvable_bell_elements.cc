@@ -9,12 +9,6 @@ namespace oomph
   const unsigned KoiterSteigmannC1CurvableBellElement::Nfield = 3;
 
 
-  //=============================================================================
-  /// Set the interpolation of each field
-  //=============================================================================
-  const std::vector<bool> KoiterSteigmannC1CurvableBellElement::
-  Field_is_bell_interpolated = {true, true, true};
-
   //======================================================================
   /// Set the data for the number of Variables at each node
   //======================================================================

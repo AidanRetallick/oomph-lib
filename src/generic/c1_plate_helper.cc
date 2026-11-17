@@ -577,8 +577,8 @@ namespace C1PlateHelper
     // their own specific implementation of the factory that creates the
     // appropriate DuplicateNodeConstraintElement, so we first get a pointer
     // to some (any!) such element...
-    TemplateFreeCurvableBellElement* bulk_el_pt=
-     dynamic_cast<TemplateFreeCurvableBellElement*>
+    TemplateFreeC1PlateElement* bulk_el_pt=
+     dynamic_cast<TemplateFreeC1PlateElement*>
      (bulk_mesh_pt->element_pt(0));
 
     // ...and the pointer to the base class then follows on to the specific
@@ -904,13 +904,13 @@ namespace C1PlateHelper
      // If the element has nodes on the curvilinear boundary, setup rotation machinery
      if(!boundary_node.empty())
       {       
-       TemplateFreeCurvableBellElement* curv_el_pt=
-        dynamic_cast<TemplateFreeCurvableBellElement*>(el_pt);
+       TemplateFreeC1PlateElement* curv_el_pt=
+        dynamic_cast<TemplateFreeC1PlateElement*>(el_pt);
 #ifdef PARANOID
        if (curv_el_pt==0)
         {
          throw OomphLibError(
-          "Cast to TemplateFreeCurvableBellElement failed",
+          "Cast to TemplateFreeC1PlateElement failed",
           OOMPH_CURRENT_FUNCTION,
           OOMPH_EXCEPTION_LOCATION);
         }

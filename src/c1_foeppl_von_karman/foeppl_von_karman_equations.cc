@@ -496,7 +496,7 @@ namespace oomph
                 {
                   // If this dof isn't pinned add its contribution to the
                   // jacobian
-                  int dof_no = internal_local_eqn(w_index, kk_type);
+                  int dof_no = internal_local_eqn(w_internal_data_index(), kk_type);
                   if (dof_no >= 0)
                   {
                     jacobian(eqn_no, dof_no) +=
@@ -513,7 +513,7 @@ namespace oomph
         {
           // Get the local equation number associated with this dof, if it
           // is not pinned, add its contribution to the residuals
-          int eqn_no = internal_local_eqn(w_index, k_type);
+          int eqn_no = internal_local_eqn(w_internal_data_index(), k_type);
           if (eqn_no >= 0)
           {
             // w - w_exact = 0
@@ -543,7 +543,7 @@ namespace oomph
               {
                 // If this dof isn't pinned add its contribution to the
                 // jacobian
-                int dof_no = internal_local_eqn(w_index, kk_type);
+                int dof_no = internal_local_eqn(w_internal_data_index(), kk_type);
                 if (dof_no >= 0)
                 {
                   jacobian(eqn_no, dof_no) +=
@@ -779,7 +779,7 @@ namespace oomph
               // Loop over the internal test functions for w
               for (unsigned k_type2 = 0; k_type2 < n_w_internal_type; k_type2++)
               {
-                local_unknown = internal_local_eqn(w_index, k_type2);
+                local_unknown = internal_local_eqn(w_internal_data_index(), k_type2);
                 // If at a non-zero degree of freedom add in the entry
                 if (local_unknown >= 0)
                 {
@@ -849,7 +849,7 @@ namespace oomph
       for (unsigned k_type = 0; k_type < n_w_internal_type; k_type++)
       {
         // Get the local equation
-        local_eqn = internal_local_eqn(w_index, k_type);
+        local_eqn = internal_local_eqn(w_internal_data_index(), k_type);
         // IF it's not a boundary condition
         if (local_eqn >= 0)
         {
@@ -948,7 +948,7 @@ namespace oomph
               for (unsigned k_type2 = 0; k_type2 < n_w_nodal_type; k_type2++)
               {
                 local_unknown = this->nodal_local_eqn(
-                  j_node2, k_type2 + 2); // [zdec] manually indexed
+                  j_node2, k_type2 + 2);
                 // If at a non-zero degree of freedom add in the entry
                 if (local_unknown >= 0)
                 {
@@ -1013,7 +1013,7 @@ namespace oomph
             for (unsigned k_type2 = 0; k_type2 < n_w_internal_type; k_type2++)
             {
               local_unknown =
-                internal_local_eqn(w_index, k_type2); // [zdec] manually indexed
+                internal_local_eqn(w_internal_data_index(), k_type2);
               // If at a non-zero degree of freedom add in the entry
               if (local_unknown >= 0)
               {
@@ -1171,7 +1171,7 @@ namespace oomph
                     // If at a non-zero degree of freedom add in the entry
                     // Get the local equation
                     local_unknown = this->nodal_local_eqn(
-                      j_node2, k_type2 + 2); // [zdec] manually indexed
+                      j_node2, k_type2 + 2);
                     // If the unknown is a degree of freedom
                     if (local_unknown >= 0)
                     {
@@ -1208,8 +1208,7 @@ namespace oomph
                      k_type2++)
                 {
                   // Get the local equation
-                  local_unknown = internal_local_eqn(
-                    w_index, k_type2); // [zdec] manually indexed
+                  local_unknown = internal_local_eqn(w_internal_data_index(), k_type2);
                   // If at a non-zero degree of freedom add in the entry
                   if (local_unknown >= 0)
                   {

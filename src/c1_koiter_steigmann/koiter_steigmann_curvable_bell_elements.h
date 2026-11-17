@@ -891,6 +891,7 @@ namespace oomph
   //          class PLATE_EQUATIONS>
   class KoiterSteigmannC1CurvableBellElement
     : public virtual CurvableBellElement<2>,
+      public virtual TemplateFreeC1PlateElement,
       public virtual KoiterSteigmannEquations
   {
   public:
@@ -901,20 +902,49 @@ namespace oomph
     /// Constructor: Call constructors for C1CurvedBellElement and
     /// KoiterSteigmannEquations
     KoiterSteigmannC1CurvableBellElement()
-      : CurvableBellElement<Nnode_1D>(Nfield, Field_is_bell_interpolated),
+      : CurvableBellElement<Nnode_1D>(),
         KoiterSteigmannEquations()
     {
-
-     // hierher Aidan: Can this go; is this handled elsewhere?
-     
-      // // Use the higher order integration scheme
-      // delete this->integral_pt();
-      // // Do we want something that is order 8 instead?
-      // TGauss<2, 9>* new_integral_pt = new TGauss<2, 9>;
-      // this->set_integration_scheme(new_integral_pt);
+      // Each displacement component uses the same scalar Bell basis.
+      for (unsigned i = 0; i < 3; ++i)
+      {
+        U_internal_data_index[i] = this->add_internal_data(new Data(0));
+      }
 
       // Rotated dof helper
       Rotated_boundary_helper_pt = new RotatedBoundaryHelper;
+    }
+
+    /// Return the actual internal Data index used by equation assembly.
+    unsigned u_i_internal_data_index(const unsigned& i_field) const override
+    {
+      return U_internal_data_index[i_field];
+    }
+
+    /// Number of internal basis functions for any displacement component.
+    unsigned ninternal_basis_type_for_field(const unsigned& i_field) const
+    {
+      return this->ninternal_basis();
+    }
+
+    /// Upgrade the geometry and allocate internal displacement dofs.
+    void upgrade_element_to_curved(
+      const C1PlateHelper::CurvedEdgeEnumeration& curved_edge,
+      const double& s_ubar, const double& s_obar,
+      C1CurviLine* parametric_edge, const unsigned& boundary_order) override
+    {
+      CurvableBellElement<Nnode_1D>::upgrade_element_to_curved(
+        curved_edge, s_ubar, s_obar, parametric_edge, boundary_order);
+      for (unsigned i = 0; i < 3; ++i)
+      {
+        u_i_internal_data_pt(i)->resize(this->ninternal_basis());
+      }
+    }
+
+    /// Return the first nodal value index of a displacement component.
+    unsigned first_nodal_type_index_for_field(const unsigned& i_field) const
+    {
+      return i_field * this->nbell_nodal_basis_type();
     }
 
     /// Destructor
@@ -1202,8 +1232,7 @@ namespace oomph
     /// Interface to return the number of nodes used by u
     virtual unsigned nu_node() const
     {
-      return CurvableBellElement<Nnode_1D>::nnode_for_field(
-        u_i_field_index(0));
+      return 3;
     }
 
     // [zdec] should always be 1,2,3? also not used in KoiterSteigmannEquations
@@ -1211,15 +1240,13 @@ namespace oomph
     /// Interface to get the local indices of the nodes used by u
     virtual Vector<unsigned> get_u_node_indices() const
     {
-      return CurvableBellElement<Nnode_1D>::nodal_indices_for_field(
-        u_i_field_index(0));
+      return {0, 1, 2};
     }
 
     /// Interface to get the number of basis types for u at node j
     virtual unsigned nu_type_at_each_node() const
     {
-      return CurvableBellElement<Nnode_1D>::nnodal_basis_type_for_field(
-        u_i_field_index(0));
+      return this->nbell_nodal_basis_type();
     }
 
     /// Interface to retrieve the value of u_i at node j of type k
@@ -1249,17 +1276,13 @@ namespace oomph
     /// the i-th displacement field
     virtual Data* u_i_internal_data_pt(const unsigned& i_field) const
     {
-      unsigned index =
-        CurvableBellElement<Nnode_1D>::index_of_internal_data_for_field(
-          i_field);
-      return internal_data_pt(index);
+      return this->internal_data_pt(U_internal_data_index[i_field]);
     }
 
     /// Interface to get the number of internal types for the u fields
     virtual unsigned nu_type_internal() const
     {
-      return CurvableBellElement<Nnode_1D>::ninternal_basis_type_for_field(
-        u_field_indices()[0]);
+      return u_i_internal_data_pt(0)->nvalue();
     }
 
     /// (pure virtual) interface to retrieve the value of u_alpha of internal
@@ -1268,9 +1291,7 @@ namespace oomph
       const unsigned& i_field,
       const unsigned& k_type) const
     {
-      unsigned index = index_of_internal_data_for_field(i_field);
-      return CurvableBellElement<Nnode_1D>::internal_value_for_field_of_type(
-        index, k_type);
+      return u_i_internal_data_pt(i_field)->value(k_type);
     }
 
     /// (pure virtual) interface to retrieve the t-th history value of u_alpha
@@ -1280,9 +1301,7 @@ namespace oomph
       const unsigned& i_field,
       const unsigned& k_type) const
     {
-      unsigned index = index_of_internal_data_for_field(i_field);
-      return CurvableBellElement<Nnode_1D>::internal_value_for_field_of_type(
-        t_time, index, k_type);
+      return u_i_internal_data_pt(i_field)->value(t_time, k_type);
     }
 
 
@@ -1356,9 +1375,8 @@ namespace oomph
     /// Static number of fields (is always 3)
     static const unsigned Nfield;
 
-    /// Static bool vector with the Bell interpolation of the fields
-    /// (always only w)
-    static const std::vector<bool> Field_is_bell_interpolated;
+    /// Indices of the internal Data for the three displacement components.
+    unsigned U_internal_data_index[3];
 
     /// \short Static int that holds the number of variables at
     /// nodes: always the same

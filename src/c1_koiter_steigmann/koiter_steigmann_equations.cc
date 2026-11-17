@@ -584,7 +584,8 @@ namespace oomph
                   for (unsigned i_field2 = 0; i_field2 < n_displacements;
                        i_field2++)
                   {
-                    local_unknown = internal_local_eqn(i_field2, k_type2);
+                    local_unknown = internal_local_eqn(
+                      u_i_internal_data_index(i_field2), k_type2);
                     // If at a non-zero degree of freedom add in the entry
                     if (local_unknown >= 0)
                     {
@@ -669,7 +670,7 @@ namespace oomph
         for (unsigned k_type = 0; k_type < n_u_internal_type; k_type++)
         {
           // Get the local equation
-          local_eqn = internal_local_eqn(i_field, k_type);
+          local_eqn = internal_local_eqn(u_i_internal_data_index(i_field), k_type);
           // IF it's not a boundary condition
           if (local_eqn >= 0)
           {
@@ -816,7 +817,8 @@ namespace oomph
                 for (unsigned i_field2 = 0; i_field2 < n_displacements;
                      i_field2++)
                 {
-                  local_unknown = internal_local_eqn(i_field2, k_type2);
+                  local_unknown = internal_local_eqn(
+                    u_i_internal_data_index(i_field2), k_type2);
                   // If at a non-zero degree of freedom add in the entry
                   if (local_unknown >= 0)
                   {

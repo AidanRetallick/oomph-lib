@@ -1857,6 +1857,9 @@ difference stress is not yet defined so an error has been thrown.",
       const unsigned& j_node,
       const unsigned& k_type) const = 0;
 
+    /// Return the internal Data index for a displacement component.
+    virtual unsigned u_i_internal_data_index(const unsigned& i_field) const = 0;
+
     /// (pure virtual) interface to get the pointer to the internal data used to
     /// interpolate u_i (NOTE: assumes each u field has exactly one internal
     /// data)

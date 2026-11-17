@@ -896,6 +896,9 @@ namespace oomph
     // /// interpolate u (NOTE: assumes each u field has exactly one internal
     // data) virtual Vector<Data*> u_internal_data_pts() const = 0;
 
+    /// Return the internal Data index for the transverse displacement.
+    virtual unsigned w_internal_data_index() const = 0;
+
     /// (pure virtual) interface to get the pointer to the internal data used
     /// to interpolate w (NOTE: assumes w field has exactly one internal data)
     virtual Data* w_internal_data_pt() const = 0;

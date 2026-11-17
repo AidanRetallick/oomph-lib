@@ -39,13 +39,6 @@ namespace oomph
   const unsigned FoepplVonKarmanC1CurvableBellElement<NNODE_1D>::Nfield = 3;
 
 
-  //=============================================================================
-  /// Set the interpolation of each field
-  //=============================================================================
-  template<unsigned NNODE_1D>
-  const std::vector<bool> FoepplVonKarmanC1CurvableBellElement<
-    NNODE_1D>::Field_is_bell_interpolated = {false, false, true};
-
 
   //======================================================================
   /// Set the data for the number of Variables at each node
